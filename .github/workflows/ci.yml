@@ -70,6 +70,18 @@ jobs:
         shell: pwsh
         run: dotnet run --project tests/Hollywood.ConPty -c Release --no-build -- artifacts/publish/hollywood.exe
 
+      - name: Build and exercise per-user Windows installer
+        if: matrix.rid == 'win-x64'
+        shell: pwsh
+        run: |
+          ./packaging/windows/build-installer.ps1 -Version 0.2.0
+          ./tests/installation/build-fixtures.ps1
+          ./tests/installation/windows-install.ps1 `
+            -SetupPath ./artifacts/installer/releases/windows/Hollywood-Setup.exe `
+            -UpgradeSetupPath ./artifacts/installer/test-fixtures/Hollywood-Upgrade-Test.exe `
+            -FailingSetupPath ./artifacts/installer/test-fixtures/Hollywood-Failure-Test.exe `
+            -SkipDefaultDirectory -SkipCollision -AllowElevatedTestHost
+
       - name: Linux and macOS PTY integration test
         if: startsWith(matrix.rid, 'linux-') || startsWith(matrix.rid, 'osx-')
         shell: bash
@@ -107,5 +119,17 @@ jobs:
             artifacts/${{ matrix.archive }}
             artifacts/${{ matrix.archive }}.sha256
             artifacts/publish/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Windows setup validation artifacts
+        if: matrix.rid == 'win-x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: hollywood-windows-setup-validation
+          path: |
+            artifacts/installer/releases/windows/Hollywood-Setup.exe
+            artifacts/installer/releases/windows/Hollywood-Setup.exe.sha256
+            artifacts/installer/releases/windows/artifact-metadata.json
           if-no-files-found: error
           retention-days: 30
