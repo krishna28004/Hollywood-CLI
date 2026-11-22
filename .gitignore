@@ -3,6 +3,8 @@
 **/obj/
 artifacts/
 .vs/
+__pycache__/
+*.py[cod]
 
 # Local user and editor state
 *.user

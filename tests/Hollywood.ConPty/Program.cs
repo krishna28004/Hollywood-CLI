@@ -41,7 +41,9 @@ try
     if (session.CapturedByteCount != pausedBytes) throw new InvalidOperationException("Terminal output continued changing while paused.");
     var resumeStart = session.CapturedByteCount;
     await session.SendKeyAsync((byte)' ');
-    await Task.Delay(900);
+    var resumeDeadline = Stopwatch.StartNew();
+    while (session.CapturedByteCount <= resumeStart && resumeDeadline.Elapsed < TimeSpan.FromSeconds(3))
+        await Task.Delay(50);
     if (session.CapturedByteCount <= resumeStart) throw new InvalidOperationException("Animation output did not resume after Space.");
 
     session.Resize(new PseudoConsoleSession.Coord(42, 12));
