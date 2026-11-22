@@ -1,0 +1,31 @@
+name: Windows CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-smoke-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Build Release
+        run: dotnet build Hollywood.sln -c Release
+      - name: Run regression harness
+        run: dotnet run --project tests/Hollywood.UnitTests -c Release --no-build
+      - name: CLI help smoke test
+        run: dotnet run --project src/Hollywood.Cli -c Release --no-build -- --help
+      - name: Configuration smoke test
+        run: dotnet run --project src/Hollywood.Cli -c Release --no-build -- config validate examples/config.json
+      - name: Snapshot smoke test
+        run: dotnet run --project src/Hollywood.Cli -c Release --no-build -- --snapshot --theme retro --layout dense --seed 42
+      - name: Publish Windows x64
+        run: dotnet publish src/Hollywood.Cli/Hollywood.Cli.csproj -c Release -r win-x64 --self-contained true -o artifacts/win-x64
+      - name: ConPTY end-to-end smoke test
+        run: dotnet run --project tests/Hollywood.ConPty -c Release --no-build -- artifacts/win-x64/hollywood.exe

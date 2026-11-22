@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Hollywood.UnitTests</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Hollywood.Engine\Hollywood.Engine.csproj" />
+    <ProjectReference Include="..\..\src\Hollywood.Cli\Hollywood.Cli.csproj" />
+  </ItemGroup>
+</Project>

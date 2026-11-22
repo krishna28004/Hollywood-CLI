@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "theme": "cyberpunk",
+  "layout": "auto",
+  "panels": 6,
+  "speed": "normal",
+  "frameRateLimit": 20,
+  "seed": 1213158473,
+  "colorMode": "auto",
+  "glyphMode": "ascii",
+  "reducedMotion": false,
+  "telemetryMode": "simulated",
+  "enabledModules": [
+    "code",
+    "network",
+    "rain",
+    "data",
+    "security",
+    "system",
+    "build",
+    "wave",
+    "topology",
+    "dashboard"
+  ]
+}
