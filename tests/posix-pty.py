@@ -19,6 +19,7 @@ class Session:
         self.pid, self.master = pty.fork()
         if self.pid == 0:
             os.environ.setdefault("TERM", "xterm-256color")
+            os.environ["HOLLYWOOD_TRACE_KEYS"] = "1"
             os.execv(executable, [executable])
         self.output = bytearray()
         self.status = None
@@ -55,7 +56,9 @@ class Session:
             if self.exit_code() is not None:
                 raise AssertionError(f"process exited before {token!r}: {self.exit_code()}")
             self.read_for(0.05)
-        raise AssertionError(f"timed out waiting for {token!r}")
+        trace = bytes(self.output).decode("utf-8", errors="replace")
+        key_events = [part for part in trace.split("[[HOLLYWOOD_KEY:")[1:] if "]]" in part]
+        raise AssertionError(f"timed out waiting for {token!r}; key events: {key_events[-5:]}")
 
     def send(self, data):
         os.write(self.master, data)
