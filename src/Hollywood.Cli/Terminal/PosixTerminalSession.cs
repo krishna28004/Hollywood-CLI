@@ -89,8 +89,6 @@ internal sealed class PosixTerminalSession : ITerminalSession
     public bool TryReadKey(out ConsoleKey key)
     {
         key = default;
-        var descriptor = new PollDescriptor { FileDescriptor = 0, Events = PollInput };
-        if (Poll(ref descriptor, 1, 0) <= 0 || (descriptor.ReturnedEvents & PollInput) == 0) return false;
         if (ReadByte(0, out var input) != 1) return false;
         key = input switch
         {
@@ -137,7 +135,7 @@ internal sealed class PosixTerminalSession : ITerminalSession
                 var localFlags = BitConverter.ToUInt64(attributes, 24);
                 localFlags &= ~(0x00000100UL | 0x00000008UL); // ICANON | ECHO; keep ISIG.
                 BitConverter.GetBytes(localFlags).CopyTo(attributes, 24);
-                attributes[32 + 16] = 1; // VMIN
+                attributes[32 + 16] = 0; // VMIN: make each nonblocking read return immediately.
                 attributes[32 + 17] = 0; // VTIME
             }
             else
@@ -146,7 +144,7 @@ internal sealed class PosixTerminalSession : ITerminalSession
                 var localFlags = BitConverter.ToUInt32(attributes, 12);
                 localFlags &= ~(0x00000002U | 0x00000008U); // ICANON | ECHO; keep ISIG.
                 BitConverter.GetBytes(localFlags).CopyTo(attributes, 12);
-                attributes[17 + 6] = 1; // VMIN
+                attributes[17 + 6] = 0; // VMIN: make each nonblocking read return immediately.
                 attributes[17 + 5] = 0; // VTIME
             }
             Marshal.Copy(attributes, 0, workingAttributes, attributes.Length);
@@ -191,25 +189,10 @@ internal sealed class PosixTerminalSession : ITerminalSession
             ? DarwinNative.SetTerminalAttributes(descriptor, action, attributes)
             : LinuxNative.SetTerminalAttributes(descriptor, action, attributes);
 
-    private static int Poll(ref PollDescriptor descriptor, nuint count, int timeout) =>
-        OperatingSystem.IsMacOS()
-            ? DarwinNative.Poll(ref descriptor, count, timeout)
-            : LinuxNative.Poll(ref descriptor, count, timeout);
-
     private static nint ReadByte(int descriptor, out byte value) =>
         OperatingSystem.IsMacOS()
             ? DarwinNative.ReadByte(descriptor, out value)
             : LinuxNative.ReadByte(descriptor, out value);
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct PollDescriptor
-    {
-        public int FileDescriptor;
-        public short Events;
-        public short ReturnedEvents;
-    }
-
-    private const short PollInput = 0x0001;
 
     private static class LinuxNative
     {
@@ -218,9 +201,6 @@ internal sealed class PosixTerminalSession : ITerminalSession
 
         [DllImport("libc", EntryPoint = "tcsetattr", SetLastError = true)]
         internal static extern int SetTerminalAttributes(int descriptor, int action, IntPtr attributes);
-
-        [DllImport("libc", EntryPoint = "poll", SetLastError = true)]
-        internal static extern int Poll(ref PollDescriptor descriptors, nuint count, int timeout);
 
         [DllImport("libc", EntryPoint = "read", SetLastError = true)]
         internal static extern nint ReadByte(int descriptor, out byte value, nuint count = 1);
@@ -233,9 +213,6 @@ internal sealed class PosixTerminalSession : ITerminalSession
 
         [DllImport("/usr/lib/libSystem.B.dylib", EntryPoint = "tcsetattr", SetLastError = true)]
         internal static extern int SetTerminalAttributes(int descriptor, int action, IntPtr attributes);
-
-        [DllImport("/usr/lib/libSystem.B.dylib", EntryPoint = "poll", SetLastError = true)]
-        internal static extern int Poll(ref PollDescriptor descriptors, nuint count, int timeout);
 
         [DllImport("/usr/lib/libSystem.B.dylib", EntryPoint = "read", SetLastError = true)]
         internal static extern nint ReadByte(int descriptor, out byte value, nuint count = 1);
