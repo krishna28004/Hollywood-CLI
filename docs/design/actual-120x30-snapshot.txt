@@ -1,0 +1,30 @@
+ HOLLYWOOD  |  SIMULATION  |  FLAGSHIP  |  6 PANELS
++-LIVE CODE STREAM  /  C#--------------++-NET TRAFFIC  /  SIM------------------++-DIGITAL RAIN  /  SIMULATION----------+
+|                                      || PACKETS 000012  LINK NOMINAL         ||                   F                  |
+| if (!terminal.Ready) return;         ||                                      ||  1                        2          |
+| if (!terminal.Ready) return;         || 192.0.2.18>198.51.100.29 TCP+A       ||  6                        7          |
+| if (!terminal.Ready) return;         || 192.0.2.173>198.51.100.13 TLS+H      ||  B                        C          |
+| return RenderResult.Ok(buffer);      || 192.0.2.229>198.51.100.215 TCP+A     ||  0                        1          |
+| async Frame Compose(Session s)       || 192.0.2.237>198.51.100.63 TLS+H      ||  5                        6          |
+| async Frame Compose(Session s)       || 192.0.2.231>198.51.100.149 TLS+H     ||  A                        B          |
+| if (!terminal.Ready) return;         || 192.0.2.234>198.51.100.176 UDP+D     ||  F                        0          |
+| await scheduler.Tick(token);         || 192.0.2.204>198.51.100.126 UDP+D     ||  4                        5          |
+| async Frame Compose(Session s)       || 192.0.2.92>198.51.100.6 DNS+Q        ||  9                        A          |
+| metrics.Commit(frame);               || 192.0.2.253>198.51.100.60 TLS+H      ||  E                        F          |
++--------------------------------------++--------------------------------------++--------------------------------------+
++-DATA  /  SIM-------------------------++-SECURITY ACTIVITY  /  SIM------------++-SYSTEM  /  SIM-----------------------+
+|                                      ||                                      ||                                      |
+| BATCH-042  [#########.........] 054% || 16:56 OK integrity baseline stable   ||                                      |
+|                                      || 16:14 INFO policy check passed       || CPU [###########.........]  55%      |
+| 00000080  DF 0E B6 9A D3 55 09 8C    || 01:49 WARN sandbox event contained   ||                                      |
+|                                      || 21:29 WARN simulated alert reviewed  ||                                      |
+| records parsed: 001,284              || 20:35 INFO policy check passed       || MEM [##########..........]  53%      |
+|                                      || 00:53 INFO policy check passed       ||                                      |
+|                                      || 13:26 INFO cipher rotation complete  ||                                      |
+|                                      || 06:09 WARN sandbox event contained   || PROC  144   UP  04:12:18             |
+|                                      || 07:53 INFO policy check passed       ||                                      |
+|                                      || 05:20 INFO policy check passed       ||                                      |
+|                                      || 18:54 WARN sandbox event contained   ||                                      |
++--------------------------------------++--------------------------------------++--------------------------------------+
+ Q QUIT  SPACE PAUSE  T THEME  L LAYOUT  |  SIMULATED ACTIVITY
+ NETWORK ADDRESSES RESERVED FOR DOCUMENTATION  |  NO LIVE TRAFFIC
