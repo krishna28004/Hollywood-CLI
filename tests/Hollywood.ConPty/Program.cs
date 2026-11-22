@@ -34,6 +34,16 @@ try
     var animatedBytes = session.CapturedByteCount;
     if (animatedBytes <= firstFrameBytes) throw new InvalidOperationException("No terminal output arrived after the first frame; animation did not progress.");
 
+    await session.SendKeyAsync((byte)' ');
+    await Task.Delay(900);
+    var pausedBytes = session.CapturedByteCount;
+    await Task.Delay(300);
+    if (session.CapturedByteCount != pausedBytes) throw new InvalidOperationException("Terminal output continued changing while paused.");
+    var resumeStart = session.CapturedByteCount;
+    await session.SendKeyAsync((byte)' ');
+    await Task.Delay(900);
+    if (session.CapturedByteCount <= resumeStart) throw new InvalidOperationException("Animation output did not resume after Space.");
+
     session.Resize(new PseudoConsoleSession.Coord(42, 12));
     await Task.Delay(500);
     session.Resize(new PseudoConsoleSession.Coord(12, 5));
@@ -60,7 +70,19 @@ try
     await escapeSession.SendKeyAsync(0x1b);
     if (!await escapeSession.WaitForExitAsync(TimeSpan.FromSeconds(5)) || escapeSession.ExitCode != 0) throw new InvalidOperationException("Escape did not exit the second session cleanly.");
 
-    Console.WriteLine($"PASS: ConPTY scene, animation (+{animatedBytes - firstFrameBytes} bytes), tiny/rapid resize, Q/Escape exits, cursor-show restoration; captured {session.CapturedByteCount} bytes in the Q scenario.");
+    using var cancelSession = new PseudoConsoleSession(executable, new PseudoConsoleSession.Coord(80, 24));
+    await cancelSession.StartAsync();
+    var cancelDeadline = Stopwatch.StartNew();
+    while (!cancelSession.CapturedText.Contains("HOLLYWOOD", StringComparison.Ordinal) && cancelDeadline.Elapsed < TimeSpan.FromSeconds(5))
+    {
+        if (cancelSession.HasExited) throw new InvalidOperationException($"Third launch exited before drawing (exit {cancelSession.ExitCode}).");
+        await Task.Delay(50);
+    }
+    if (!cancelSession.CapturedText.Contains("HOLLYWOOD", StringComparison.Ordinal)) throw new TimeoutException("Third launch did not draw a scene within five seconds.");
+    await cancelSession.SendKeyAsync(0x03);
+    if (!await cancelSession.WaitForExitAsync(TimeSpan.FromSeconds(5)) || cancelSession.ExitCode != 130) throw new InvalidOperationException($"ConPTY Ctrl+C input did not return expected code 130 (got {cancelSession.ExitCode}).");
+
+    Console.WriteLine($"PASS: ConPTY scene/animation (+{animatedBytes - firstFrameBytes} bytes), pause/resume, tiny/rapid resize, Q/Escape/Ctrl+C exits, cursor-show restoration; Ctrl+C returned 130.");
     return 0;
 }
 catch (Exception exception)

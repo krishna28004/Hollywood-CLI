@@ -19,7 +19,7 @@ Phase 3 hardening. Status: **CONDITIONAL**; direct-host behavior and performance
 - Release build and current console test harness passed after the changes, with zero compiler warnings/errors.
 - The harness covers 96,000 layout cases, renderer behavior, deterministic random streams, config round-tripping, invalid schema/value/unknown/duplicate properties, and theme palette output.
 - CLI help, a Retro Amber dense snapshot, sample config validation, and rejection of a missing explicitly selected config were exercised.
-- Added and ran a Windows ConPTY harness against the self-contained x64 executable. It captured a live scene and 1,644 additional bytes during a 700 ms animation interval; resized to 42×12, 12×5, and 120×30; observed the tiny fallback; sent Q and Escape to separate launches; and verified cursor-show output and exit code 0.
+- Added and ran a Windows ConPTY harness against the self-contained x64 executable. The latest run captured a live scene and 3,276 additional bytes during a 700 ms animation interval; verified pause and resumed output; resized to 42×12, 12×5, and 120×30; observed the tiny fallback; sent Q, Escape, and ETX/Ctrl+C to separate launches; and verified cursor-show output and appropriate exit codes (0/130).
 - Windows UI automation initialization timed out. No direct interactive Windows Terminal/Console Host claim is made.
 
 ## Bugs found and addressed
@@ -33,7 +33,7 @@ Phase 3 hardening. Status: **CONDITIONAL**; direct-host behavior and performance
 
 ## Remaining risks and next tasks
 
-1. Extend ConPTY tests for pause/resume, Ctrl+C control events, output stalls, and injected acquisition/write failures.
+1. Add output-stall and injected acquisition/write-failure tests.
 2. Validate terminal mode restoration and shell usability in a visible Windows Terminal and Console Host.
 3. Fix verified lifecycle/renderer defects and add regression coverage.
 4. Record real performance measurements; no benchmark has been run.

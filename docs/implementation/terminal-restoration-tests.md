@@ -7,7 +7,7 @@ Current code inspection shows that it saves input/output modes, enters the alter
 | Case | Status | Evidence needed |
 |---|---|---|
 | Normal Q/Esc exit | Pass in ConPTY | Q and Escape each returned 0; cursor-show sequence captured. Direct shell usability and original mode values were not observed. |
-| Ctrl+C | Not tested | Deliver an actual console control event; distinguish from a literal `0x03` byte. |
+| Ctrl+C | Pass in ConPTY | Sending ETX (`0x03`) caused the app's cancel path to exit with code 130 and restore cursor visibility. Direct Windows Terminal/Console Host input remains unverified. |
 | Partial acquisition failure | Not tested | Inject failures after each console-mode/VT setup step and verify rollback. |
 | Renderer write failure | Not tested | Inject a failing writer and verify original exception remains visible while restoration is attempted. |
 | Repeated process launch/exit | Pass in ConPTY | Two independent pseudoconsole sessions completed Q and Escape shutdown. Repeated `Dispose()` on the same lease is still not directly tested. |

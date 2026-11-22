@@ -2,10 +2,10 @@
 
 ## High priority
 
-- Direct Windows Terminal/Console Host behavior remains unverified. ConPTY confirms scene output, Q/Escape, tiny/rapid resize, and cursor-show restoration only.
+- Direct Windows Terminal/Console Host behavior remains unverified. ConPTY confirms scene output, pause/resume, ETX/Ctrl+C cancellation, Q/Escape, tiny/rapid resize, and cursor-show restoration.
 - `TerminalLease.Dispose` swallows terminal restoration write failures; cleanup status is not surfaced yet.
-- No ConPTY end-to-end harness or performance benchmark exists.
-- Ctrl+C control-event handling, stalled-output backpressure, forced writer failure, and terminal mode values still need tests.
+- No performance benchmark exists.
+- Stalled-output backpressure, forced writer failure, and direct terminal mode restoration still need tests.
 
 ## Feature gaps
 

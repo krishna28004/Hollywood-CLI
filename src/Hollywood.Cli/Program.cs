@@ -30,7 +30,7 @@ internal static class Program
         {
             Console.CancelKeyPress += Cancel;
             void Cancel(object? sender, ConsoleCancelEventArgs eventArgs) { eventArgs.Cancel = true; cancellation.Cancel(); }
-            try { Run(lease!, cancellation.Token, options); return 0; }
+            try { Run(lease!, cancellation.Token, options); return cancellation.IsCancellationRequested ? 130 : 0; }
             catch (OperationCanceledException) { return 130; }
             catch (Exception exception) { Console.Error.WriteLine($"Hollywood stopped: {exception.Message}"); return 1; }
             finally { Console.CancelKeyPress -= Cancel; }
@@ -93,7 +93,10 @@ internal static class Program
             while (terminal.TryReadKey(out var key))
             {
                 if (key is ConsoleKey.Q or ConsoleKey.Escape) return;
-                if (key == ConsoleKey.Spacebar) paused = !paused;
+                if (key == ConsoleKey.Spacebar)
+                {
+                    paused = !paused;
+                }
                 if (key == ConsoleKey.T) { theme = (theme + 1) % 5; renderer.ThemeIndex = theme; renderer.Invalidate(); }
                 if (key == ConsoleKey.L) requestedCount = requestedCount switch { 2 => 3, 3 => 6, 6 => 10, _ => 2 };
             }
