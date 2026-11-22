@@ -89,8 +89,18 @@ internal sealed class PosixTerminalSession : ITerminalSession
     public bool TryReadKey(out ConsoleKey key)
     {
         key = default;
-        if (!Console.KeyAvailable) return false;
-        key = Console.ReadKey(intercept: true).Key;
+        var descriptor = new PollDescriptor { FileDescriptor = 0, Events = PollInput };
+        if (Poll(ref descriptor, 1, 0) <= 0 || (descriptor.ReturnedEvents & PollInput) == 0) return false;
+        if (ReadByte(0, out var input) != 1) return false;
+        key = input switch
+        {
+            (byte)'q' or (byte)'Q' => ConsoleKey.Q,
+            (byte)'t' or (byte)'T' => ConsoleKey.T,
+            (byte)'l' or (byte)'L' => ConsoleKey.L,
+            (byte)' ' => ConsoleKey.Spacebar,
+            0x1b => ConsoleKey.Escape,
+            _ => ConsoleKey.NoName
+        };
         return true;
     }
 
@@ -181,6 +191,26 @@ internal sealed class PosixTerminalSession : ITerminalSession
             ? DarwinNative.SetTerminalAttributes(descriptor, action, attributes)
             : LinuxNative.SetTerminalAttributes(descriptor, action, attributes);
 
+    private static int Poll(ref PollDescriptor descriptor, nuint count, int timeout) =>
+        OperatingSystem.IsMacOS()
+            ? DarwinNative.Poll(ref descriptor, count, timeout)
+            : LinuxNative.Poll(ref descriptor, count, timeout);
+
+    private static nint ReadByte(int descriptor, out byte value) =>
+        OperatingSystem.IsMacOS()
+            ? DarwinNative.ReadByte(descriptor, out value)
+            : LinuxNative.ReadByte(descriptor, out value);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PollDescriptor
+    {
+        public int FileDescriptor;
+        public short Events;
+        public short ReturnedEvents;
+    }
+
+    private const short PollInput = 0x0001;
+
     private static class LinuxNative
     {
         [DllImport("libc", EntryPoint = "tcgetattr", SetLastError = true)]
@@ -188,6 +218,12 @@ internal sealed class PosixTerminalSession : ITerminalSession
 
         [DllImport("libc", EntryPoint = "tcsetattr", SetLastError = true)]
         internal static extern int SetTerminalAttributes(int descriptor, int action, IntPtr attributes);
+
+        [DllImport("libc", EntryPoint = "poll", SetLastError = true)]
+        internal static extern int Poll(ref PollDescriptor descriptors, nuint count, int timeout);
+
+        [DllImport("libc", EntryPoint = "read", SetLastError = true)]
+        internal static extern nint ReadByte(int descriptor, out byte value, nuint count = 1);
     }
 
     private static class DarwinNative
@@ -197,5 +233,11 @@ internal sealed class PosixTerminalSession : ITerminalSession
 
         [DllImport("/usr/lib/libSystem.B.dylib", EntryPoint = "tcsetattr", SetLastError = true)]
         internal static extern int SetTerminalAttributes(int descriptor, int action, IntPtr attributes);
+
+        [DllImport("/usr/lib/libSystem.B.dylib", EntryPoint = "poll", SetLastError = true)]
+        internal static extern int Poll(ref PollDescriptor descriptors, nuint count, int timeout);
+
+        [DllImport("/usr/lib/libSystem.B.dylib", EntryPoint = "read", SetLastError = true)]
+        internal static extern nint ReadByte(int descriptor, out byte value, nuint count = 1);
     }
 }
