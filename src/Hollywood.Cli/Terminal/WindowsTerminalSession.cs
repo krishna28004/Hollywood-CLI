@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 
 namespace Hollywood.Cli.Terminal;
 
-public sealed class TerminalLease : IDisposable
+internal sealed class WindowsTerminalSession : ITerminalSession
 {
     private const uint EnableProcessedOutput = 0x0001;
     private const uint EnableVirtualTerminalProcessing = 0x0004;
@@ -26,8 +26,9 @@ public sealed class TerminalLease : IDisposable
 
     public int Width { get; private set; }
     public int Height { get; private set; }
+    public TextWriter Output => Console.Out;
 
-    private TerminalLease(IntPtr input, IntPtr output, uint inputMode, uint outputMode, bool ownsInput, bool ownsOutput, IntPtr originalStdOut)
+    private WindowsTerminalSession(IntPtr input, IntPtr output, uint inputMode, uint outputMode, bool ownsInput, bool ownsOutput, IntPtr originalStdOut)
     {
         inputHandle = input;
         outputHandle = output;
@@ -38,7 +39,7 @@ public sealed class TerminalLease : IDisposable
         originalStandardOutput = originalStdOut;
     }
 
-    public static bool TryAcquire(out TerminalLease? lease, out string error)
+    public static bool TryAcquire(out ITerminalSession? lease, out string error)
     {
         lease = null;
         error = string.Empty;
@@ -78,7 +79,7 @@ public sealed class TerminalLease : IDisposable
             }
         }
 
-        var acquired = new TerminalLease(input, output, inputMode, outputMode, ownsInput, ownsOutput, GetStdHandle(-11));
+        var acquired = new WindowsTerminalSession(input, output, inputMode, outputMode, ownsInput, ownsOutput, GetStdHandle(-11));
         try
         {
             if (ownsOutput)

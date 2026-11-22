@@ -71,6 +71,23 @@ var second = new DeterministicRandom(12345);
 for (var i = 0; i < 1000; i++) Check(first.NextUInt() == second.NextUInt(), "Seeded random streams diverged.");
 
 var configPath = Path.Combine(Path.GetTempPath(), $"hollywood-config-test-{Guid.NewGuid():N}.json");
+if (OperatingSystem.IsWindows())
+    Check(AppConfiguration.DefaultPath.EndsWith(Path.Combine("Hollywood", "config.json"), StringComparison.Ordinal), "Windows config path must use LocalAppData/Hollywood.");
+else if (OperatingSystem.IsMacOS())
+    Check(AppConfiguration.DefaultPath.EndsWith(Path.Combine("Library", "Application Support", "Hollywood", "config.json"), StringComparison.Ordinal), "macOS config path must use Application Support.");
+else if (OperatingSystem.IsLinux())
+{
+    var originalXdg = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
+    var testXdg = Path.Combine(Path.GetTempPath(), $"hollywood-xdg-{Guid.NewGuid():N}");
+    try
+    {
+        Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", testXdg);
+        Check(AppConfiguration.DefaultPath == Path.Combine(testXdg, "hollywood", "config.json"), "Linux config path must honor absolute XDG_CONFIG_HOME.");
+        Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", "relative-config");
+        Check(AppConfiguration.DefaultPath.EndsWith(Path.Combine(".config", "hollywood", "config.json"), StringComparison.Ordinal), "Linux config path must ignore relative XDG_CONFIG_HOME.");
+    }
+    finally { Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", originalXdg); }
+}
 try
 {
     File.WriteAllText(configPath, AppConfiguration.Serialize(new AppConfiguration { Theme = "retro", Panels = 10, FrameRateLimit = 30 }));

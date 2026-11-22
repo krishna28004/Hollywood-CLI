@@ -20,8 +20,23 @@ public sealed record AppConfiguration
         "code", "network", "rain", "data", "security", "system", "build", "wave", "topology", "dashboard"
     ];
 
-    public static string DefaultPath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Hollywood", "config.json");
+    public static string DefaultPath
+    {
+        get
+        {
+            if (OperatingSystem.IsWindows())
+                return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Hollywood", "config.json");
+
+            if (OperatingSystem.IsMacOS())
+                return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Library", "Application Support", "Hollywood", "config.json");
+
+            var xdgConfigHome = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
+            var configRoot = !string.IsNullOrWhiteSpace(xdgConfigHome) && Path.IsPathRooted(xdgConfigHome)
+                ? xdgConfigHome
+                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config");
+            return Path.Combine(configRoot, "hollywood", "config.json");
+        }
+    }
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {

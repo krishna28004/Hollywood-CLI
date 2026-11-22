@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Hollywood.Cli.Configuration;
 using Hollywood.Cli.Terminal;
 using Hollywood.Engine.Layout;
@@ -21,17 +22,19 @@ internal static class Program
         if (args.Length > 0 && args[0] == "config") return RunConfigCommand(args[1..]);
         if (!TryParse(args, out var options, out var parseError)) { Console.Error.WriteLine(parseError); return 2; }
         if (options.Help) { PrintHelp(); return 0; }
-        if (options.ShowVersion) { Console.WriteLine($"Hollywood for Windows {Version}"); return 0; }
+        if (options.ShowVersion) { Console.WriteLine($"Hollywood CLI {Version}"); return 0; }
         if (options.Snapshot) { PrintSnapshot(options); return 0; }
-        if (!TerminalLease.TryAcquire(out var lease, out var error)) { Console.Error.WriteLine(error); return 3; }
+        if (!TerminalSessionFactory.TryAcquire(out var lease, out var error)) { Console.Error.WriteLine(error); return 3; }
 
         using (lease)
         using (var cancellation = new CancellationTokenSource())
         {
+            var cancellationExitCode = 130;
+            using var signals = RegisterTerminationSignals(cancellation, () => Interlocked.Exchange(ref cancellationExitCode, 143));
             Console.CancelKeyPress += Cancel;
-            void Cancel(object? sender, ConsoleCancelEventArgs eventArgs) { eventArgs.Cancel = true; cancellation.Cancel(); }
-            try { Run(lease!, cancellation.Token, options); return cancellation.IsCancellationRequested ? 130 : 0; }
-            catch (OperationCanceledException) { return 130; }
+            void Cancel(object? sender, ConsoleCancelEventArgs eventArgs) { eventArgs.Cancel = true; Interlocked.Exchange(ref cancellationExitCode, 130); cancellation.Cancel(); }
+            try { Run(lease!, cancellation.Token, options); return cancellation.IsCancellationRequested ? Volatile.Read(ref cancellationExitCode) : 0; }
+            catch (OperationCanceledException) { return Volatile.Read(ref cancellationExitCode); }
             catch (Exception exception) { Console.Error.WriteLine($"Hollywood stopped: {exception.Message}"); return 1; }
             finally { Console.CancelKeyPress -= Cancel; }
         }
@@ -69,17 +72,40 @@ internal static class Program
         }
     }
 
-    private static void Run(TerminalLease terminal, CancellationToken token, Options options)
+    private static IDisposable? RegisterTerminationSignals(CancellationTokenSource cancellation, Action onTerminate)
+    {
+        if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS()) return null;
+        var registrations = new List<PosixSignalRegistration>
+        {
+            PosixSignalRegistration.Create(PosixSignal.SIGTERM, context =>
+            {
+                context.Cancel = true;
+                onTerminate();
+                cancellation.Cancel();
+            })
+        };
+        return new SignalRegistrationSet(registrations);
+    }
+
+    private sealed class SignalRegistrationSet(List<PosixSignalRegistration> registrations) : IDisposable
+    {
+        public void Dispose()
+        {
+            foreach (var registration in registrations) registration.Dispose();
+        }
+    }
+
+    private static void Run(ITerminalSession terminal, CancellationToken token, Options options)
     {
         var modules = CreateModules(options.EnabledModules);
         try { RunSession(terminal, token, modules, options); }
         finally { foreach (var module in modules) module.Dispose(); }
     }
 
-    private static void RunSession(TerminalLease terminal, CancellationToken token, IVisualModule[] modules, Options options)
+    private static void RunSession(ITerminalSession terminal, CancellationToken token, IVisualModule[] modules, Options options)
     {
         var random = new DeterministicRandom(options.Seed);
-        var renderer = new VtRenderer { ThemeIndex = options.Theme, ColorMode = options.ColorMode };
+        var renderer = new VtRenderer(terminal.Output) { ThemeIndex = options.Theme, ColorMode = ResolveColorMode(options.ColorMode) };
         var clock = Stopwatch.StartNew();
         var previous = clock.Elapsed;
         var paused = false;
@@ -118,6 +144,20 @@ internal static class Program
     }
 
     private static TimeSpan Scale(TimeSpan time, double factor) => TimeSpan.FromTicks((long)(time.Ticks * factor));
+
+    private static string ResolveColorMode(string requested)
+    {
+        if (requested != "auto") return requested;
+        if (Environment.GetEnvironmentVariable("NO_COLOR") is not null || Console.IsOutputRedirected) return "mono";
+        if (!OperatingSystem.IsWindows())
+        {
+            var colorTerm = Environment.GetEnvironmentVariable("COLORTERM");
+            if (colorTerm is "truecolor" or "24bit") return "truecolor";
+            var term = Environment.GetEnvironmentVariable("TERM") ?? string.Empty;
+            if (!term.Contains("256color", StringComparison.OrdinalIgnoreCase)) return "16color";
+        }
+        return "auto";
+    }
 
     private static int VisiblePanelCount(int width, int height, int requested)
     {
@@ -250,7 +290,7 @@ internal static class Program
     private static string ThemeKey(int theme) => theme switch { 0 => "classic", 1 => "cyberpunk", 2 => "soc", 3 => "matrix", 4 => "retro", _ => "" };
     private static string ThemeName(int theme) => theme switch { 1 => "CYBERPUNK", 2 => "SOC", 3 => "MATRIX", 4 => "RETRO AMBER", _ => "CLASSIC" };
 
-    private static void PrintHelp() => Console.WriteLine($"Hollywood for Windows {Version}\n\nUsage: hollywood [--help|--version|--snapshot] [--config PATH|--no-config] [--theme classic|cyberpunk|soc|matrix|retro] [--panels 2|3|6|10] [--layout auto|focus|dense] [--speed slow|normal|fast] [--fps 1..60] [--reduced-motion] [--seed N]\n\nConfig: hollywood config path|show|validate [PATH]\nInteractive keys: Q/Esc quit, Space pause/resume, T theme, L layout.\nAll displayed activity is simulated.");
+    private static void PrintHelp() => Console.WriteLine($"Hollywood CLI {Version}\n\nUsage: hollywood [--help|--version|--snapshot] [--config PATH|--no-config] [--theme classic|cyberpunk|soc|matrix|retro] [--panels 2|3|6|10] [--layout auto|focus|dense] [--speed slow|normal|fast] [--fps 1..60] [--reduced-motion] [--seed N]\n\nConfig: hollywood config path|show|validate [PATH]\nInteractive keys: Q/Esc quit, Space pause/resume, T theme, L layout.\nAll displayed activity is simulated.");
 
     private static IVisualModule[] CreateModules(string[] enabled)
     {
