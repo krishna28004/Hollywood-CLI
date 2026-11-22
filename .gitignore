@@ -1,0 +1,19 @@
+# Build output
+**/bin/
+**/obj/
+artifacts/
+.vs/
+
+# Local user and editor state
+*.user
+*.suo
+.idea/
+.vscode/
+
+# Source research supplied for local reference only
+/read materials/
+
+# Temporary test output
+TestResults/
+*.tmp
+*.log

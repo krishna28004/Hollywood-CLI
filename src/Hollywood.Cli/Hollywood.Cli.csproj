@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>hollywood</AssemblyName>
+    <RootNamespace>Hollywood.Cli</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Hollywood.Engine\Hollywood.Engine.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Hollywood.Engine</AssemblyName>
+    <RootNamespace>Hollywood.Engine</RootNamespace>
+  </PropertyGroup>
+</Project>

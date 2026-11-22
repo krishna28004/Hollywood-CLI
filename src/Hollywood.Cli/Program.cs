@@ -1,0 +1,264 @@
+using System.Diagnostics;
+using Hollywood.Cli.Configuration;
+using Hollywood.Cli.Terminal;
+using Hollywood.Engine.Layout;
+using Hollywood.Engine.Modules;
+using Hollywood.Engine.Rendering;
+using Hollywood.Engine.Simulation;
+
+namespace Hollywood.Cli;
+
+internal static class Program
+{
+    private const string Version = "0.2.0";
+    private sealed record Options(
+        bool Help, bool ShowVersion, bool Snapshot, bool ReducedMotion,
+        int Theme, int Panels, uint Seed, int FrameRate, string Speed, string ColorMode,
+        string[] EnabledModules);
+
+    private static int Main(string[] args)
+    {
+        if (args.Length > 0 && args[0] == "config") return RunConfigCommand(args[1..]);
+        if (!TryParse(args, out var options, out var parseError)) { Console.Error.WriteLine(parseError); return 2; }
+        if (options.Help) { PrintHelp(); return 0; }
+        if (options.ShowVersion) { Console.WriteLine($"Hollywood for Windows {Version}"); return 0; }
+        if (options.Snapshot) { PrintSnapshot(options); return 0; }
+        if (!TerminalLease.TryAcquire(out var lease, out var error)) { Console.Error.WriteLine(error); return 3; }
+
+        using (lease)
+        using (var cancellation = new CancellationTokenSource())
+        {
+            Console.CancelKeyPress += Cancel;
+            void Cancel(object? sender, ConsoleCancelEventArgs eventArgs) { eventArgs.Cancel = true; cancellation.Cancel(); }
+            try { Run(lease!, cancellation.Token, options); return 0; }
+            catch (OperationCanceledException) { return 130; }
+            catch (Exception exception) { Console.Error.WriteLine($"Hollywood stopped: {exception.Message}"); return 1; }
+            finally { Console.CancelKeyPress -= Cancel; }
+        }
+    }
+
+    private static int RunConfigCommand(string[] args)
+    {
+        if (args.Length == 0) { Console.Error.WriteLine("Usage: hollywood config path|show|validate [path]"); return 2; }
+        var path = args.Length > 1 ? Path.GetFullPath(args[1]) : AppConfiguration.DefaultPath;
+        if (args.Length > 2) { Console.Error.WriteLine("Too many arguments for config command."); return 2; }
+        try
+        {
+            switch (args[0])
+            {
+                case "path":
+                    if (args.Length != 1) throw new ArgumentException("Usage: hollywood config path");
+                    Console.WriteLine(AppConfiguration.DefaultPath);
+                    return 0;
+                case "show":
+                    Console.Write(File.Exists(path) ? AppConfiguration.Serialize(AppConfiguration.Load(path)) : AppConfiguration.Serialize(new AppConfiguration()));
+                    return 0;
+                case "validate":
+                    _ = AppConfiguration.Load(path);
+                    Console.WriteLine($"Valid configuration: {path}");
+                    return 0;
+                default:
+                    Console.Error.WriteLine("Usage: hollywood config path|show|validate [path]");
+                    return 2;
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or ArgumentException)
+        {
+            Console.Error.WriteLine($"Configuration error: {exception.Message}");
+            return 2;
+        }
+    }
+
+    private static void Run(TerminalLease terminal, CancellationToken token, Options options)
+    {
+        var modules = CreateModules(options.EnabledModules);
+        try { RunSession(terminal, token, modules, options); }
+        finally { foreach (var module in modules) module.Dispose(); }
+    }
+
+    private static void RunSession(TerminalLease terminal, CancellationToken token, IVisualModule[] modules, Options options)
+    {
+        var random = new DeterministicRandom(options.Seed);
+        var renderer = new VtRenderer { ThemeIndex = options.Theme, ColorMode = options.ColorMode };
+        var clock = Stopwatch.StartNew();
+        var previous = clock.Elapsed;
+        var paused = false;
+        var requestedCount = options.Panels;
+        var theme = options.Theme;
+        var interval = TimeSpan.FromSeconds(1d / options.FrameRate);
+
+        while (!token.IsCancellationRequested)
+        {
+            var frameStart = clock.Elapsed;
+            while (terminal.TryReadKey(out var key))
+            {
+                if (key is ConsoleKey.Q or ConsoleKey.Escape) return;
+                if (key == ConsoleKey.Spacebar) paused = !paused;
+                if (key == ConsoleKey.T) { theme = (theme + 1) % 5; renderer.ThemeIndex = theme; renderer.Invalidate(); }
+                if (key == ConsoleKey.L) requestedCount = requestedCount switch { 2 => 3, 3 => 6, 6 => 10, _ => 2 };
+            }
+
+            terminal.RefreshSize();
+            var now = clock.Elapsed;
+            var elapsed = now - previous;
+            previous = now;
+            if (options.ReducedMotion) elapsed = Scale(elapsed, 0.35);
+            else elapsed = Scale(elapsed, options.Speed switch { "slow" => 0.6, "fast" => 1.7, _ => 1.0 });
+            var activeCount = Math.Min(VisiblePanelCount(terminal.Width, terminal.Height, requestedCount), modules.Length);
+            if (!paused && activeCount > 0)
+                for (var index = 0; index < activeCount; index++) modules[index].Update(elapsed, random);
+
+            RenderFrame(terminal.Width, terminal.Height, modules, activeCount, paused, theme, clock.Elapsed, renderer);
+            var remaining = interval - (clock.Elapsed - frameStart);
+            if (remaining > TimeSpan.Zero) Thread.Sleep(remaining);
+        }
+    }
+
+    private static TimeSpan Scale(TimeSpan time, double factor) => TimeSpan.FromTicks((long)(time.Ticks * factor));
+
+    private static int VisiblePanelCount(int width, int height, int requested)
+    {
+        if (width < 20 || height < 7) return 0;
+        if (width < 48 || height < 14) return 1;
+        if (width < 80 || height < 24) return Math.Min(requested, 2);
+        if (width < 120 || height < 30) return Math.Min(requested, 4);
+        return requested;
+    }
+
+    private static void RenderFrame(int width, int height, IVisualModule[] modules, int activeCount, bool paused, int theme, TimeSpan elapsed, VtRenderer renderer)
+    {
+        if (width < 20 || height < 7)
+        {
+            var tiny = new Canvas(width, height);
+            tiny.Write(0, 0, "RESIZE  |  Q QUIT");
+            renderer.Write(tiny);
+            return;
+        }
+
+        var canvas = new Canvas(width, height);
+        var rects = LayoutSolver.Solve(width, height, activeCount);
+        canvas.Write(1, 0, $"HOLLYWOOD  |  SIMULATION  |  THEME {ThemeName(theme)}  |  {activeCount} PANELS", 2);
+        for (var i = 0; i < rects.Count; i++) modules[i].Render(canvas, rects[i], elapsed);
+        canvas.Write(1, height - 2, $"Q QUIT  SPACE {(paused ? "RESUME" : "PAUSE")}  T THEME  L LAYOUT  |  SIMULATED ACTIVITY", 2);
+        canvas.Write(1, height - 1, "NETWORK ADDRESSES RESERVED FOR DOCUMENTATION  |  NO LIVE TRAFFIC", 1);
+        renderer.Write(canvas);
+    }
+
+    private static void PrintSnapshot(Options options)
+    {
+        const int width = 120, height = 30;
+        var modules = CreateModules(options.EnabledModules);
+        try
+        {
+            var random = new DeterministicRandom(options.Seed);
+            var canvas = new Canvas(width, height);
+            var rects = LayoutSolver.Solve(width, height, options.Panels);
+            for (var tick = 0; tick < 18; tick++) foreach (var module in modules) module.Update(TimeSpan.FromMilliseconds(500), random);
+            canvas.Write(1, 0, $"HOLLYWOOD  |  SIMULATION  |  {ThemeName(options.Theme)}  |  {options.Panels} PANELS", 2);
+            for (var index = 0; index < Math.Min(rects.Count, modules.Length); index++) modules[index].Render(canvas, rects[index], TimeSpan.FromSeconds(9));
+            canvas.Write(1, height - 2, "Q QUIT  SPACE PAUSE  T THEME  L LAYOUT  |  SIMULATED ACTIVITY", 2);
+            canvas.Write(1, height - 1, "NETWORK ADDRESSES RESERVED FOR DOCUMENTATION  |  NO LIVE TRAFFIC", 1);
+            Console.WriteLine(canvas.ToPlainText());
+        }
+        finally { foreach (var module in modules) module.Dispose(); }
+    }
+
+    private static bool TryParse(string[] args, out Options options, out string error)
+    {
+        var configPath = AppConfiguration.DefaultPath;
+        var configSpecified = false;
+        var loadConfig = true;
+        var help = false; var showVersion = false; var snapshot = false; var reduced = (bool?)null;
+        int? themeOverride = null; int? panelsOverride = null; uint? seedOverride = null; int? frameRateOverride = null; string? speedOverride = null;
+        error = string.Empty;
+        for (var index = 0; index < args.Length; index++)
+        {
+            var argument = args[index];
+            if (argument is "--help" or "-h") { help = true; continue; }
+            if (argument == "--version") { showVersion = true; continue; }
+            if (argument == "--snapshot") { snapshot = true; continue; }
+            if (argument == "--no-config") { loadConfig = false; continue; }
+            if (argument is "--config" or "--theme" or "--panels" or "--layout" or "--seed" or "--speed" or "--fps")
+            {
+                if (++index >= args.Length) { error = $"{argument} requires a value."; options = default!; return false; }
+                var value = args[index];
+                switch (argument)
+                {
+                    case "--config":
+                        if (string.IsNullOrWhiteSpace(value)) { error = "--config requires a non-empty path."; options = default!; return false; }
+                        configPath = value; configSpecified = true; break;
+                    case "--theme":
+                        themeOverride = ParseTheme(value);
+                        if (themeOverride < 0) { error = "Theme must be classic, cyberpunk, soc, matrix, or retro."; options = default!; return false; }
+                        break;
+                    case "--panels":
+                        if (!int.TryParse(value, out var panelCount) || panelCount is not (2 or 3 or 6 or 10)) { error = "Panel count must be 2, 3, 6, or 10."; options = default!; return false; }
+                        panelsOverride = panelCount; break;
+                    case "--layout":
+                        panelsOverride = value.ToLowerInvariant() switch { "focus" => 2, "auto" => 6, "dense" => 10, _ => -1 };
+                        if (panelsOverride < 0) { error = "Layout must be auto, focus, or dense."; options = default!; return false; }
+                        break;
+                    case "--seed":
+                        if (!uint.TryParse(value, out var seed)) { error = "Seed must be an unsigned 32-bit integer."; options = default!; return false; }
+                        seedOverride = seed; break;
+                    case "--speed":
+                        if (value is not ("slow" or "normal" or "fast")) { error = "Speed must be slow, normal, or fast."; options = default!; return false; }
+                        speedOverride = value; break;
+                    case "--fps":
+                        if (!int.TryParse(value, out var fps) || fps is < 1 or > 60) { error = "Frame rate must be between 1 and 60."; options = default!; return false; }
+                        frameRateOverride = fps; break;
+                }
+                continue;
+            }
+            if (argument == "--reduced-motion") { reduced = true; continue; }
+            error = $"Unknown option: {argument}. Try --help."; options = default!; return false;
+        }
+        if ((help ? 1 : 0) + (showVersion ? 1 : 0) + (snapshot ? 1 : 0) > 1) { error = "Use only one of --help, --version, and --snapshot."; options = default!; return false; }
+        if (!loadConfig && args.Contains("--config", StringComparer.Ordinal)) { error = "--config cannot be combined with --no-config."; options = default!; return false; }
+        if (help || showVersion)
+        {
+            var defaults = new AppConfiguration();
+            options = new Options(help, showVersion, false, false, ParseTheme(defaults.Theme), defaults.Panels, defaults.Seed, defaults.FrameRateLimit, defaults.Speed, defaults.ColorMode, defaults.EnabledModules);
+            return true;
+        }
+        try
+        {
+            var config = loadConfig && (File.Exists(configPath) || configSpecified) ? AppConfiguration.Load(configPath) : new AppConfiguration();
+            if (!loadConfig && args.Contains("--config", StringComparer.Ordinal)) throw new InvalidDataException("--config cannot be combined with --no-config.");
+            config = config with {
+                Theme = ThemeKey(themeOverride ?? ParseTheme(config.Theme)),
+                Panels = panelsOverride ?? (config.Layout switch { "focus" => 2, "dense" => 10, _ => config.Panels }),
+                Seed = seedOverride ?? config.Seed,
+                Speed = speedOverride ?? config.Speed,
+                FrameRateLimit = frameRateOverride ?? config.FrameRateLimit,
+                ReducedMotion = reduced ?? config.ReducedMotion
+            };
+            config.Validate();
+            options = new Options(help, showVersion, snapshot, config.ReducedMotion, ParseTheme(config.Theme), config.Panels, config.Seed, config.ReducedMotion ? Math.Min(config.FrameRateLimit, 8) : config.FrameRateLimit, config.Speed, config.ColorMode, config.EnabledModules);
+            return true;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidDataException)
+        {
+            error = $"Configuration error: {exception.Message}"; options = default!; return false;
+        }
+    }
+
+    private static int ParseTheme(string theme) => theme.ToLowerInvariant() switch { "classic" => 0, "cyberpunk" => 1, "soc" => 2, "matrix" => 3, "retro" => 4, _ => -1 };
+    private static string ThemeKey(int theme) => theme switch { 0 => "classic", 1 => "cyberpunk", 2 => "soc", 3 => "matrix", 4 => "retro", _ => "" };
+    private static string ThemeName(int theme) => theme switch { 1 => "CYBERPUNK", 2 => "SOC", 3 => "MATRIX", 4 => "RETRO AMBER", _ => "CLASSIC" };
+
+    private static void PrintHelp() => Console.WriteLine($"Hollywood for Windows {Version}\n\nUsage: hollywood [--help|--version|--snapshot] [--config PATH|--no-config] [--theme classic|cyberpunk|soc|matrix|retro] [--panels 2|3|6|10] [--layout auto|focus|dense] [--speed slow|normal|fast] [--fps 1..60] [--reduced-motion] [--seed N]\n\nConfig: hollywood config path|show|validate [PATH]\nInteractive keys: Q/Esc quit, Space pause/resume, T theme, L layout.\nAll displayed activity is simulated.");
+
+    private static IVisualModule[] CreateModules(string[] enabled)
+    {
+        var all = new (string Id, IVisualModule Module)[]
+        {
+            ("code", new CodeStreamModule()), ("network", new NetworkTrafficModule()), ("rain", new DigitalRainModule()),
+            ("data", new DataProcessingModule()), ("security", new SecurityFeedModule()), ("system", new SystemMetricsModule()),
+            ("build", new BuildLogsModule()), ("wave", new AsciiWaveModule()), ("topology", new NetworkTopologyModule()), ("dashboard", new DashboardMetricsModule())
+        };
+        var selected = all.Where(item => enabled.Contains(item.Id, StringComparer.Ordinal)).Select(item => item.Module).ToArray();
+        foreach (var item in all.Where(item => !enabled.Contains(item.Id, StringComparer.Ordinal))) item.Module.Dispose();
+        return selected;
+    }
+}
