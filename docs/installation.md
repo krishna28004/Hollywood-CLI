@@ -1,58 +1,40 @@
-# Installation status and portable workflows
+# Installation
 
-**No public packages or installer exist yet.** The commands below describe the intended release workflow; they are not package-manager install commands that work today. Do not download release archives from unofficial mirrors.
+## Current availability
 
-## Release archive names
+There is no public release or package-manager listing yet. The Windows setup and archives built from this checkout are local validation artifacts, not signed public downloads. The repository has no `LICENSE` file; do not redistribute artifacts until the project owner chooses and adds a license.
 
-| Platform | Archive |
-|---|---|
-| Windows x64 | `hollywood-win-x64.zip` |
-| Windows ARM64 | `hollywood-win-arm64.zip` |
-| Linux x64 | `hollywood-linux-x64.tar.gz` |
-| Linux ARM64 | `hollywood-linux-arm64.tar.gz` |
-| macOS Intel | `hollywood-osx-x64.tar.gz` |
-| macOS Apple Silicon | `hollywood-osx-arm64.tar.gz` |
+## Windows 10/11 setup (local build)
 
-CI is being prepared to generate these per-RID self-contained archives with a SHA-256 sidecar and artifact metadata. A passing build artifact is not yet a published, signed release.
+The developer build script creates a self-contained per-user installer and portable archives for x64 and ARM64:
 
-## Intended portable use
+```powershell
+./packaging/windows/build-installer.ps1
+```
 
-### Windows 10/11
+The setup output is `artifacts/installer/releases/windows/Hollywood-Setup.exe`. To install, extract the downloaded release archive, double-click `Hollywood-Setup.exe`, accept the per-user destination, then open a new PowerShell or Command Prompt and run `hollywood`. If that command is already provided by another application, setup selects `hollywood-cli` and explains the choice. Setup does not require administrator privileges or change execution policy. The uninstaller removes the command-path entry it owns and preserves `%LOCALAPPDATA%\Hollywood` configuration.
 
-1. Download the matching ZIP from a future verified release and extract it to a folder you own, for example `%LOCALAPPDATA%\Programs\Hollywood`.
-2. Open PowerShell in that folder and run `.hollywood.exe`.
-3. To use `hollywood` from any folder, add that exact per-user install folder to your user PATH through Windows Settings. The archive will not edit PATH or registry state.
-4. Remove the extracted folder and the optional user PATH entry to uninstall.
+The local installer is unsigned and may trigger Windows reputation warnings. Do not bypass security warnings for artifacts from an unverified source. Release signing credentials and a declared project license are required before public distribution.
 
-### Linux (Ubuntu/Debian and other distributions)
+The portable archives are:
 
-1. Download the matching x64 or ARM64 archive from a future verified release.
-2. Extract it into a user-owned directory, for example `~/.local/opt/hollywood`.
-3. Run `./hollywood` from that directory.
-4. For command lookup, copy or symlink the binary into a user-owned directory already on PATH, such as `~/.local/bin`; do not overwrite a package-owned `/usr/bin/hollywood`.
-5. Remove the user-owned extracted files/symlink to uninstall.
+- `hollywood-win-x64.zip`
+- `hollywood-win-arm64.zip`
 
-Linux artifacts will target glibc, not every libc. The planned Ubuntu 22.04 build baseline must be confirmed in CI; Ubuntu 20.04 or other older glibc systems may be incompatible, and Alpine/musl is outside the initial target unless separately built and tested.
+Extract a matching archive into a user-owned folder and run `hollywood.exe`. Portable archives do not edit PATH or registry state.
 
-### macOS Intel and Apple Silicon
+## Linux
 
-1. Download the archive matching the Mac's CPU architecture from a future verified release.
-2. Extract it into a user-owned directory and run `./hollywood` from Terminal or iTerm2.
-3. Optionally add a user-owned symlink under `~/.local/bin` if that directory is already on PATH.
-4. Remove only the extracted directory/symlink to uninstall.
+No `.deb` or `.rpm` package is currently produced. The cross-platform CI builds portable glibc-targeted archives for x64 and ARM64. Extract the matching verified archive into a user-owned directory and run `./hollywood`. To add a command, place a symlink named `hollywood-cli` in a user-owned PATH directory such as `~/.local/bin`; the original Linux Hollywood project may own `/usr/bin/hollywood`, which must not be overwritten. Linux distribution and glibc compatibility still require qualification on each claimed target.
 
-The current release workflow does not sign or notarize macOS binaries. Gatekeeper may warn or block an unsigned archive. A release is not ready to claim frictionless macOS installation until Developer ID signing, notarization, staple verification, and a clean-user download test are in place. Do not disable Gatekeeper or security protections to run an unverified binary.
+## macOS
 
-## Command-name collision
+No `.pkg`, Homebrew formula, signed, or notarized macOS release is currently available. CI targets Intel and Apple Silicon portable archives. A downloaded unsigned build is a development artifact and may be blocked or warned on by Gatekeeper. Do not disable Gatekeeper to run it. A frictionless release requires Developer ID signing, notarization, staple verification, and clean-machine testing.
 
-The Linux Hollywood package may already install a `hollywood` executable. Before adding this application to PATH, check `command -v hollywood` (Linux/macOS) or `Get-Command hollywood` (PowerShell). Do not overwrite an existing package-owned binary. Use an isolated user-owned folder and resolve PATH precedence deliberately; a future installer must detect an existing command and provide a distinct alias such as `hollywood-cli` rather than replacing it silently.
+## Configuration
 
-## Package-manager goals
+Configuration uses one versioned JSON schema. Windows stores it under `%LOCALAPPDATA%\Hollywood`; Linux uses `$XDG_CONFIG_HOME/hollywood` or `~/.config/hollywood`; macOS uses the documented Application Support location. Uninstallers must preserve user configuration.
 
-These are not currently available:
+## Package managers
 
-- Windows: a verified WinGet manifest after stable release and checksum validation.
-- macOS: a Homebrew formula after signing/notarization and release automation are established.
-- Linux: distribution packages or maintained repositories only after libc and distribution compatibility are qualified.
-
-No package ID, formula, or Linux repository name is published yet.
+No WinGet package ID, Homebrew formula, or Linux package repository has been published. Names and install commands will be added only after the corresponding package is actually published and verified.
