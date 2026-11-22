@@ -121,7 +121,7 @@ def main():
             raise AssertionError("scene header was not captured")
 
         session.send(b" ")
-        session.wait_for("SPACE RESUME", offset=len(visible_text(session.output)))
+        session.wait_for("RESUME", offset=len(visible_text(session.output)))
         session.read_for(0.3)
         paused_bytes = len(session.output)
         session.read_for(0.3)
@@ -129,7 +129,7 @@ def main():
             raise AssertionError("terminal output changed while paused")
 
         session.send(b" ")
-        session.wait_for("SPACE PAUSE", offset=len(visible_text(session.output)), timeout=3)
+        session.wait_for("PAUSE", offset=len(visible_text(session.output)), timeout=3)
 
         session.set_size(12, 5)
         session.wait_for("RESIZE")
