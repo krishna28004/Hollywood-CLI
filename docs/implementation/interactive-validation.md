@@ -14,7 +14,7 @@
 | Sample JSON validation | Pass | `config validate examples/config.json` |
 | Explicit missing configuration | Rejected as expected | `--config .\does-not-exist.json --snapshot` exited nonzero with a configuration error. |
 | ConPTY launch and first scene | Pass | `dotnet run --project tests/Hollywood.ConPty -c Release --no-build -- artifacts/win-x64/hollywood.exe`; frame header captured within 5 seconds. |
-| Animation progression | Pass | 3,276 additional VT output bytes captured over a 700 ms interval in the latest successful run. This is an activity check, not a performance benchmark. |
+| Animation progression | Pass | 2,678 additional VT output bytes captured over a 700 ms interval in the latest successful run. This is an activity check, not a performance benchmark. |
 | Resize 80×24 → 42×12 → 12×5 → 120×30 | Pass | Tiny viewport displayed the compact `RESIZE` fallback; returning to 120×30 redrew the scene. |
 | Q exit and repeat launch | Pass | First session exited with code 0; a second process launched after it. |
 | Escape exit | Pass | Second process exited with code 0 after Escape. |

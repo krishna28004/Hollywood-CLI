@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Phase 3 hardening. Status: **CONDITIONAL**; direct-host behavior and performance have not been proven.
+Cross-platform milestone C2/C3. Status: **IN PROGRESS**; the POSIX implementation, tests, and six-RID CI are authored but have not yet executed on Linux/macOS. Windows ConPTY and performance/direct-host validation remain outstanding.
 
 ## Completed in this work cycle
 
@@ -13,13 +13,15 @@ Phase 3 hardening. Status: **CONDITIONAL**; direct-host behavior and performance
 - Updated user documentation and added a sample configuration.
 - Built a local portable Windows x64 ZIP and SHA-256 manifest. These are ignored artifacts, not source history.
 - Initialized a separate project-local Git repository. Its ignore rules exclude the local research folder, build outputs, and artifacts.
+- Completed the cross-platform audit and introduced `ITerminalSession`, retaining the Windows Win32 adapter while adding a shared POSIX adapter, POSIX SIGTERM cancellation, conservative color fallback, and platform-specific config paths.
+- Added a Python standard-library PTY end-to-end harness for Linux/macOS and a native-runner CI matrix for Windows/Linux/macOS x64/ARM64. These tests/workflows have not yet run on a POSIX runner.
 
 ## Verification evidence
 
 - Release build and current console test harness passed after the changes, with zero compiler warnings/errors.
 - The harness covers 96,000 layout cases, renderer behavior, deterministic random streams, config round-tripping, invalid schema/value/unknown/duplicate properties, and theme palette output.
 - CLI help, a Retro Amber dense snapshot, sample config validation, and rejection of a missing explicitly selected config were exercised.
-- Added and ran a Windows ConPTY harness against the self-contained x64 executable. The latest run captured a live scene and 3,276 additional bytes during a 700 ms animation interval; verified pause and resumed output; resized to 42×12, 12×5, and 120×30; observed the tiny fallback; sent Q, Escape, and ETX/Ctrl+C to separate launches; and verified cursor-show output and appropriate exit codes (0/130).
+- Added and ran a Windows ConPTY harness against the self-contained single-file x64 executable. The latest run captured a live scene and 2,678 additional bytes over 700 ms; verified pause/resume; resized to 42×12, 12×5, and 120×30; observed the tiny fallback; sent Q, Escape, and ETX/Ctrl+C to separate launches; and verified cursor-show output and exit codes (0/130). One earlier resumed-output timing check failed and was corrected to poll for a bounded interval; the corrected harness passed on rerun.
 - Windows UI automation initialization timed out. No direct interactive Windows Terminal/Console Host claim is made.
 
 ## Bugs found and addressed
@@ -30,16 +32,17 @@ Phase 3 hardening. Status: **CONDITIONAL**; direct-host behavior and performance
 - Panel rendering is capped to the number of enabled modules.
 - Initial ConPTY testing found console standard streams can be non-console handles even though `CONOUT$`/`CONIN$` exist. Terminal acquisition now falls back to those console device handles and reads keyboard events from the Win32 console input queue.
 - Resize testing found .NET window-size properties did not report the pseudoconsole viewport. Size polling now reads `GetConsoleScreenBufferInfo`, and a dimension change clears the previous viewport before drawing.
+- Cross-platform audit found terminal acquisition was directly wired into CLI orchestration; platform selection now goes through a shared terminal-session contract.
 
 ## Remaining risks and next tasks
 
-1. Add output-stall and injected acquisition/write-failure tests.
-2. Validate terminal mode restoration and shell usability in a visible Windows Terminal and Console Host.
-3. Fix verified lifecycle/renderer defects and add regression coverage.
-4. Record real performance measurements; no benchmark has been run.
-5. Verify the local ZIP checksum and clean-user launch; prepare dependency/license notices.
-6. Create the requested private GitHub remote and push only reviewed project files. No GitHub remote exists yet; GitHub CLI and its connector are unavailable in this environment.
+1. Build and run the POSIX PTY harness and six-RID CI on actual Linux/macOS/Windows runners; fix platform-specific issues from evidence.
+2. Validate visible Windows Terminal, Console Host, GNOME Terminal/Konsole, SSH/tmux, Terminal.app, and iTerm2 sessions.
+3. Add output-stall and injected acquisition/write-failure tests; record terminal restoration behavior.
+4. Record platform-specific performance measurements; no benchmark has been run.
+5. Verify clean-user portable launches, archive checksums, libc baseline, and macOS signing/notarization requirements.
+6. Create the requested private GitHub remote and push only reviewed project files after authenticated GitHub access is available.
 
 ## Continuation
 
-Start with `dotnet build Hollywood.sln -c Release --no-restore -m:1 -v:minimal`, then run `dotnet run --project tests/Hollywood.UnitTests -c Release --no-build` and `dotnet run --project tests/Hollywood.ConPty -c Release --no-build -- artifacts/win-x64/hollywood.exe`. Keep local-only research materials outside the repository history. Do not claim direct-host compatibility until Windows Terminal/Console Host evidence exists.
+Start with `dotnet build Hollywood.sln -c Release --no-restore -m:1 -v:minimal`, run `dotnet run --project tests/Hollywood.UnitTests -c Release --no-build`, publish a native platform RID, then run `tests/Hollywood.ConPty` on Windows or `python3 tests/posix-pty.py <native-publish-path>` on Linux/macOS. Keep local-only research materials outside repository history. Do not claim a platform or terminal host is validated until its native evidence is recorded.

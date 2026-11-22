@@ -1,6 +1,6 @@
 # Terminal restoration test status
 
-**Status: PARTIALLY VERIFIED through ConPTY; direct host state inspection remains untested.** The implementation is in `src/Hollywood.Cli/Terminal/TerminalLease.cs`.
+**Status: Windows partially verified through ConPTY; POSIX PTY and direct host state inspection remain untested.** Platform adapters are in `src/Hollywood.Cli/Terminal/`.
 
 Current code inspection shows that it saves input/output modes, enters the alternate screen, hides the cursor, and attempts best-effort restoration on disposal. Acquisition rollback calls the same disposal path. This is code inspection only; no sentinel-screen or host restoration test has run.
 
@@ -12,6 +12,7 @@ Current code inspection shows that it saves input/output modes, enters the alter
 | Renderer write failure | Not tested | Inject a failing writer and verify original exception remains visible while restoration is attempted. |
 | Repeated process launch/exit | Pass in ConPTY | Two independent pseudoconsole sessions completed Q and Escape shutdown. Repeated `Dispose()` on the same lease is still not directly tested. |
 | Forced process termination | Not guaranteed | Document host-dependent recovery; no watchdog or persistent recovery process is intended. |
+| POSIX Q/Escape/Ctrl+C/SIGTERM and restore | Harness implemented; pending native runners | Run `tests/posix-pty.py` on Linux and macOS; capture exit status and cursor restoration. |
 
 The harness does not assert alternate-screen escape pairs because ConPTY processes those modes internally. A direct visible host test with a recognizable preexisting screen sentinel is still required.
 
