@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "theme": "cyberpunk",
+  "theme": "soc",
   "layout": "auto",
-  "panels": 6,
+  "panels": 7,
   "speed": "normal",
   "frameRateLimit": 20,
   "seed": 1213158473,
@@ -12,14 +12,13 @@
   "telemetryMode": "simulated",
   "enabledModules": [
     "code",
-    "network",
-    "rain",
-    "data",
-    "security",
     "system",
-    "build",
     "wave",
+    "network",
+    "security",
+    "data",
     "topology",
+    "build",
     "dashboard"
   ]
 }

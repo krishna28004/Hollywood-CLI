@@ -7,7 +7,7 @@ public sealed class DigitalRainModule : IVisualModule
 {
     private readonly List<(int X, int Y, int Length)> streams = new();
     private TimeSpan accumulated;
-    public string Title => "DIGITAL RAIN  /  SIMULATION";
+    public string Title => "DIGITAL RAIN";
 
     public void Update(TimeSpan elapsed, DeterministicRandom random)
     {

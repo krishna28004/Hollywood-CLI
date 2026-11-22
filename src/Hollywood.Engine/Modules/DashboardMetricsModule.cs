@@ -8,7 +8,7 @@ public sealed class DashboardMetricsModule : IVisualModule
     private int events = 12_846;
     private int jobs = 342;
     private TimeSpan accumulated;
-    public string Title => "OPERATIONS  /  SIM";
+    public string Title => "OPS COUNTERS  [FIXTURE]";
 
     public void Update(TimeSpan elapsed, DeterministicRandom random)
     {
@@ -25,7 +25,7 @@ public sealed class DashboardMetricsModule : IVisualModule
         canvas.Write(bounds.X + 2, bounds.Y, Title, 2, bounds);
         canvas.Write(bounds.X + 2, bounds.Y + 3, $"EVENTS {events:N0}", 3, bounds);
         canvas.Write(bounds.X + 2, bounds.Y + 5, $"JOBS   {jobs:N0}", 1, bounds);
-        canvas.Write(bounds.X + 2, bounds.Y + 7, "STATUS NOMINAL (SIM)", 3, bounds);
+        canvas.Write(bounds.X + 2, bounds.Y + 7, "STATUS: NOMINAL", 3, bounds);
     }
 
     public void Dispose() { }

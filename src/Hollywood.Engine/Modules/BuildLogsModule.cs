@@ -9,14 +9,15 @@ public sealed class BuildLogsModule : IVisualModule
     private readonly Queue<string> lines = new();
     private TimeSpan accumulated;
     private int stage;
-    public string Title => "BUILD LOGS  /  SIM";
+    public string Title => "BUILD PIPELINE  [CI FIXTURE]";
 
     public void Update(TimeSpan elapsed, DeterministicRandom random)
     {
         accumulated += elapsed;
         if (accumulated < TimeSpan.FromMilliseconds(900)) return;
         accumulated = TimeSpan.Zero;
-        lines.Enqueue($"{DateTime.UnixEpoch.AddSeconds(random.Next(86400)):HH:mm:ss}  {Stages[stage]}");
+        var clock = new DateTime(2025, 2, 14, 14, 37, 0, DateTimeKind.Utc).AddSeconds(random.Next(86400));
+        lines.Enqueue($"{clock:HH:mm:ss} UTC  {Stages[stage]}");
         stage = (stage + 1) % Stages.Length;
         while (lines.Count > 20) lines.Dequeue();
     }

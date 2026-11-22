@@ -5,36 +5,66 @@ namespace Hollywood.Engine.Modules;
 
 public sealed class SystemMetricsModule : IVisualModule
 {
-    private int cpu = 42;
-    private int memory = 61;
+    private static readonly string[] Processes =
+    [
+        "python3 collector.py", "analyzer-worker", "systemd-journald", "netflowd --fixture",
+        "sshd: ubuntu@pts/1", "node event-pipeline.js", "redis-server *:6379", "dotnet Hollywood.Engine"
+    ];
+
+    private int cpu = 13;
+    private int memory = 68;
+    private int swap = 7;
     private int tick;
     private TimeSpan accumulated;
-    public string Title => "SYSTEM  /  SIM";
+    private TimeSpan uptime;
+    public string Title => "SYSTEM LOAD";
 
     public void Update(TimeSpan elapsed, DeterministicRandom random)
     {
+        uptime += elapsed;
         accumulated += elapsed;
-        if (accumulated < TimeSpan.FromMilliseconds(500)) return;
-        accumulated = TimeSpan.Zero;
-        cpu = Math.Clamp(cpu + random.Next(17) - 8, 8, 96);
-        memory = Math.Clamp(memory + random.Next(7) - 3, 24, 91);
-        tick++;
+        while (accumulated >= TimeSpan.FromMilliseconds(240))
+        {
+            accumulated -= TimeSpan.FromMilliseconds(240);
+            cpu = Math.Clamp(cpu + random.Next(13) - 6, 3, 92);
+            memory = Math.Clamp(memory + random.Next(5) - 2, 52, 79);
+            swap = Math.Clamp(swap + random.Next(3) - 1, 3, 13);
+            tick++;
+        }
     }
 
     public void Render(Canvas canvas, Rect bounds, TimeSpan elapsed)
     {
         canvas.Border(bounds, 2);
         canvas.Write(bounds.X + 2, bounds.Y, Title, 2, bounds);
-        DrawMeter(canvas, bounds, bounds.Y + 3, "CPU", cpu, 1);
-        DrawMeter(canvas, bounds, bounds.Y + 6, "MEM", memory, 3);
-        canvas.Write(bounds.X + 2, bounds.Y + 9, $"PROC  {126 + tick % 23:D3}   UP  04:12:{tick % 60:D2}", 1, bounds);
+        if (bounds.Height < 5) return;
+
+        DrawMeter(canvas, bounds, bounds.Y + 1, "CPU", cpu, 3);
+        DrawMeter(canvas, bounds, bounds.Y + 2, "MEM", memory, 5);
+        DrawMeter(canvas, bounds, bounds.Y + 3, "SWP", swap, 4);
+        if (bounds.Height < 7) return;
+
+        var up = $"{(int)uptime.TotalDays:D1}d {uptime.Hours:D2}:{uptime.Minutes:D2}:{uptime.Seconds:D2}";
+        canvas.Write(bounds.X + 2, bounds.Y + 4, $"Tasks: 214  thr: 620  load: {0.71 + cpu / 100d:0.00} {0.69 + cpu / 100d:0.00} 1.32  up {up}", 0, bounds);
+        canvas.Write(bounds.X + 2, bounds.Y + 5, "PID USER  PRI NI  VIRT   RES   CPU% MEM% COMMAND", 2, bounds);
+
+        var availableRows = Math.Max(0, bounds.Height - 7);
+        for (var row = 0; row < availableRows; row++)
+        {
+            var processIndex = (tick / 2 + row) % Processes.Length;
+            var processCpu = Math.Max(0.1, (cpu * (0.08 + ((processIndex * 13) % 19) / 100d)));
+            var processMemory = 0.4 + processIndex * 0.23;
+            var pid = 2371 + processIndex * 317;
+            var line = $"{pid,4} ubuntu 20  0  {128 + processIndex * 31,3}M {48 + processIndex * 17,3}M {processCpu,4:0.0} {processMemory,4:0.0} {Processes[processIndex]}";
+            canvas.Write(bounds.X + 2, bounds.Y + 6 + row, line, processIndex == 0 ? (byte)4 : (byte)0, bounds);
+        }
     }
 
     private static void DrawMeter(Canvas canvas, Rect bounds, int row, string label, int percent, byte style)
     {
-        var width = Math.Clamp(bounds.Width - 16, 3, 20);
+        var width = Math.Clamp(bounds.Width - 27, 4, 30);
         var filled = width * percent / 100;
-        canvas.Write(bounds.X + 2, row, $"{label} [{new string('#', filled)}{new string('.', width - filled)}] {percent,3}%", style, bounds);
+        canvas.Write(bounds.X + 2, row, $"{label,-3} [{new string('|', filled)}{new string('.', width - filled)}] {percent,3}%", style, bounds);
     }
 
     public void Dispose() { }

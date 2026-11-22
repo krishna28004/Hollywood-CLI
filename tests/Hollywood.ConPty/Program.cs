@@ -22,29 +22,25 @@ try
     using var session = new PseudoConsoleSession(executable, new PseudoConsoleSession.Coord(80, 24));
     await session.StartAsync();
     var sceneDeadline = Stopwatch.StartNew();
-    while (!session.CapturedText.Contains("HOLLYWOOD", StringComparison.Ordinal) && sceneDeadline.Elapsed < TimeSpan.FromSeconds(5))
+    while (!session.CapturedText.Contains("Ubuntu 24.04", StringComparison.Ordinal) && sceneDeadline.Elapsed < TimeSpan.FromSeconds(5))
     {
         if (session.HasExited) throw new InvalidOperationException($"Application exited before drawing a scene (exit {session.ExitCode}): {session.CapturedText}");
         await Task.Delay(50);
     }
-    if (!session.CapturedText.Contains("HOLLYWOOD", StringComparison.Ordinal)) throw new TimeoutException("No Hollywood frame appeared within five seconds.");
+    if (!session.CapturedText.Contains("Hollywood demo", StringComparison.Ordinal)) throw new TimeoutException("No Hollywood frame appeared within five seconds.");
 
     var firstFrameBytes = session.CapturedByteCount;
     await Task.Delay(700);
     var animatedBytes = session.CapturedByteCount;
     if (animatedBytes <= firstFrameBytes) throw new InvalidOperationException("No terminal output arrived after the first frame; animation did not progress.");
 
-    await session.SendKeyAsync((byte)' ');
-    await Task.Delay(900);
-    var pausedBytes = session.CapturedByteCount;
-    await Task.Delay(300);
-    if (session.CapturedByteCount != pausedBytes) throw new InvalidOperationException("Terminal output continued changing while paused.");
-    var resumeStart = session.CapturedByteCount;
-    await session.SendKeyAsync((byte)' ');
-    var resumeDeadline = Stopwatch.StartNew();
-    while (session.CapturedByteCount <= resumeStart && resumeDeadline.Elapsed < TimeSpan.FromSeconds(3))
-        await Task.Delay(50);
-    if (session.CapturedByteCount <= resumeStart) throw new InvalidOperationException("Animation output did not resume after Space.");
+    foreach (var key in new byte[] { (byte)'q', (byte)'t', (byte)'l', (byte)'x', (byte)' ', (byte)0x1b })
+        await session.SendKeyAsync(key);
+    await Task.Delay(800);
+    if (session.HasExited) throw new InvalidOperationException("An ordinary key exited the scene; only Ctrl+C should stop it.");
+    var ignoredKeyBytes = session.CapturedByteCount;
+    await Task.Delay(400);
+    if (session.CapturedByteCount <= ignoredKeyBytes) throw new InvalidOperationException("Animation stopped after ordinary keys were pressed.");
 
     session.Resize(new PseudoConsoleSession.Coord(42, 12));
     await Task.Delay(500);
@@ -54,37 +50,40 @@ try
         throw new InvalidOperationException($"Tiny viewport did not receive its compact fallback prompt. Captured tail: {session.CapturedText[^Math.Min(1200, session.CapturedText.Length)..]}");
     session.Resize(new PseudoConsoleSession.Coord(120, 30));
     await Task.Delay(250);
-    await session.SendKeyAsync((byte)'q');
-    if (!await session.WaitForExitAsync(TimeSpan.FromSeconds(5))) throw new TimeoutException("Application did not exit after Q within five seconds.");
-    if (session.ExitCode != 0) throw new InvalidOperationException($"Q exit returned code {session.ExitCode}.");
+    await session.SendKeyAsync(0x03);
+    if (!await session.WaitForExitAsync(TimeSpan.FromSeconds(5))) throw new TimeoutException("Application did not exit after Ctrl+C within five seconds.");
+    if (session.ExitCode != 130) throw new InvalidOperationException($"Ctrl+C exit returned code {session.ExitCode}, expected 130.");
     if (!session.CapturedText.Contains("\u001b[?25h", StringComparison.Ordinal))
-        throw new InvalidOperationException("Cursor-show restoration sequence was missing after Q exit.");
+        throw new InvalidOperationException("Cursor-show restoration sequence was missing after Ctrl+C.");
 
     using var escapeSession = new PseudoConsoleSession(executable, new PseudoConsoleSession.Coord(80, 24));
     await escapeSession.StartAsync();
     var escapeDeadline = Stopwatch.StartNew();
-    while (!escapeSession.CapturedText.Contains("HOLLYWOOD", StringComparison.Ordinal) && escapeDeadline.Elapsed < TimeSpan.FromSeconds(5))
+    while (!escapeSession.CapturedText.Contains("Ubuntu 24.04", StringComparison.Ordinal) && escapeDeadline.Elapsed < TimeSpan.FromSeconds(5))
     {
         if (escapeSession.HasExited) throw new InvalidOperationException($"Second launch exited before drawing (exit {escapeSession.ExitCode}).");
         await Task.Delay(50);
     }
-    if (!escapeSession.CapturedText.Contains("HOLLYWOOD", StringComparison.Ordinal)) throw new TimeoutException("Second launch did not draw a scene within five seconds.");
+    if (!escapeSession.CapturedText.Contains("Hollywood demo", StringComparison.Ordinal)) throw new TimeoutException("Second launch did not draw a scene within five seconds.");
     await escapeSession.SendKeyAsync(0x1b);
-    if (!await escapeSession.WaitForExitAsync(TimeSpan.FromSeconds(5)) || escapeSession.ExitCode != 0) throw new InvalidOperationException("Escape did not exit the second session cleanly.");
+    await Task.Delay(350);
+    if (escapeSession.HasExited) throw new InvalidOperationException("Escape should be ignored; Ctrl+C is the only keyboard exit.");
+    await escapeSession.SendKeyAsync(0x03);
+    if (!await escapeSession.WaitForExitAsync(TimeSpan.FromSeconds(5)) || escapeSession.ExitCode != 130) throw new InvalidOperationException("Ctrl+C did not exit after Escape was ignored.");
 
     using var cancelSession = new PseudoConsoleSession(executable, new PseudoConsoleSession.Coord(80, 24));
     await cancelSession.StartAsync();
     var cancelDeadline = Stopwatch.StartNew();
-    while (!cancelSession.CapturedText.Contains("HOLLYWOOD", StringComparison.Ordinal) && cancelDeadline.Elapsed < TimeSpan.FromSeconds(5))
+    while (!cancelSession.CapturedText.Contains("Ubuntu 24.04", StringComparison.Ordinal) && cancelDeadline.Elapsed < TimeSpan.FromSeconds(5))
     {
         if (cancelSession.HasExited) throw new InvalidOperationException($"Third launch exited before drawing (exit {cancelSession.ExitCode}).");
         await Task.Delay(50);
     }
-    if (!cancelSession.CapturedText.Contains("HOLLYWOOD", StringComparison.Ordinal)) throw new TimeoutException("Third launch did not draw a scene within five seconds.");
+    if (!cancelSession.CapturedText.Contains("Hollywood demo", StringComparison.Ordinal)) throw new TimeoutException("Third launch did not draw a scene within five seconds.");
     await cancelSession.SendKeyAsync(0x03);
     if (!await cancelSession.WaitForExitAsync(TimeSpan.FromSeconds(5)) || cancelSession.ExitCode != 130) throw new InvalidOperationException($"ConPTY Ctrl+C input did not return expected code 130 (got {cancelSession.ExitCode}).");
 
-    Console.WriteLine($"PASS: ConPTY scene/animation (+{animatedBytes - firstFrameBytes} bytes), pause/resume, tiny/rapid resize, Q/Escape/Ctrl+C exits, cursor-show restoration; Ctrl+C returned 130.");
+    Console.WriteLine($"PASS: ConPTY scene/animation (+{animatedBytes - firstFrameBytes} bytes), ignored ordinary keys, tiny/rapid resize, Ctrl+C exit, cursor-show restoration.");
     return 0;
 }
 catch (Exception exception)

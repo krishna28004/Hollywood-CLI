@@ -6,9 +6,9 @@ namespace Hollywood.Cli.Configuration;
 public sealed record AppConfiguration
 {
     public int SchemaVersion { get; init; } = 1;
-    public string Theme { get; init; } = "classic";
+    public string Theme { get; init; } = "soc";
     public string Layout { get; init; } = "auto";
-    public int Panels { get; init; } = 6;
+    public int Panels { get; init; } = 7;
     public string Speed { get; init; } = "normal";
     public int FrameRateLimit { get; init; } = 20;
     public uint Seed { get; init; } = 0x484F4C59;
@@ -17,7 +17,7 @@ public sealed record AppConfiguration
     public bool ReducedMotion { get; init; }
     public string TelemetryMode { get; init; } = "simulated";
     public string[] EnabledModules { get; init; } = [
-        "code", "network", "rain", "data", "security", "system", "build", "wave", "topology", "dashboard"
+        "code", "system", "wave", "network", "security", "data", "topology", "build", "dashboard", "rain"
     ];
 
     public static string DefaultPath
@@ -66,7 +66,7 @@ public sealed record AppConfiguration
         if (SchemaVersion != 1) throw new InvalidDataException($"Unsupported configuration schemaVersion: {SchemaVersion}.");
         if (Theme is not ("classic" or "cyberpunk" or "soc" or "matrix" or "retro")) throw new InvalidDataException("theme must be classic, cyberpunk, soc, matrix, or retro.");
         if (Layout is not ("auto" or "focus" or "dense")) throw new InvalidDataException("layout must be auto, focus, or dense.");
-        if (Panels is not (2 or 3 or 6 or 10)) throw new InvalidDataException("panels must be 2, 3, 6, or 10.");
+        if (Panels is not (2 or 3 or 6 or 7 or 10)) throw new InvalidDataException("panels must be 2, 3, 6, 7, or 10.");
         if (Speed is not ("slow" or "normal" or "fast")) throw new InvalidDataException("speed must be slow, normal, or fast.");
         if (FrameRateLimit is < 1 or > 60) throw new InvalidDataException("frameRateLimit must be between 1 and 60.");
         if (ColorMode is not ("auto" or "truecolor" or "16color" or "mono")) throw new InvalidDataException("colorMode must be auto, truecolor, 16color, or mono.");

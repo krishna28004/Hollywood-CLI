@@ -1,30 +1,30 @@
- HOLLYWOOD  |  SIMULATION  |  FLAGSHIP  |  6 PANELS
-+-LIVE CODE STREAM  /  C#--------------++-NET TRAFFIC  /  SIM------------------++-DIGITAL RAIN  /  SIMULATION----------+
-|                                      || PACKETS 000012  LINK NOMINAL         ||                   F                  |
-| if (!terminal.Ready) return;         ||                                      ||  1                        2          |
-| if (!terminal.Ready) return;         || 192.0.2.18>198.51.100.29 TCP+A       ||  6                        7          |
-| if (!terminal.Ready) return;         || 192.0.2.173>198.51.100.13 TLS+H      ||  B                        C          |
-| return RenderResult.Ok(buffer);      || 192.0.2.229>198.51.100.215 TCP+A     ||  0                        1          |
-| async Frame Compose(Session s)       || 192.0.2.237>198.51.100.63 TLS+H      ||  5                        6          |
-| async Frame Compose(Session s)       || 192.0.2.231>198.51.100.149 TLS+H     ||  A                        B          |
-| if (!terminal.Ready) return;         || 192.0.2.234>198.51.100.176 UDP+D     ||  F                        0          |
-| await scheduler.Tick(token);         || 192.0.2.204>198.51.100.126 UDP+D     ||  4                        5          |
-| async Frame Compose(Session s)       || 192.0.2.92>198.51.100.6 DNS+Q        ||  9                        A          |
-| metrics.Commit(frame);               || 192.0.2.253>198.51.100.60 TLS+H      ||  E                        F          |
-+--------------------------------------++--------------------------------------++--------------------------------------+
-+-DATA  /  SIM-------------------------++-SECURITY ACTIVITY  /  SIM------------++-SYSTEM  /  SIM-----------------------+
-|                                      ||                                      ||                                      |
-| BATCH-042  [#########.........] 054% || 16:56 OK integrity baseline stable   ||                                      |
-|                                      || 16:14 INFO policy check passed       || CPU [###########.........]  55%      |
-| 00000080  DF 0E B6 9A D3 55 09 8C    || 01:49 WARN sandbox event contained   ||                                      |
-|                                      || 21:29 WARN simulated alert reviewed  ||                                      |
-| records parsed: 001,284              || 20:35 INFO policy check passed       || MEM [##########..........]  53%      |
-|                                      || 00:53 INFO policy check passed       ||                                      |
-|                                      || 13:26 INFO cipher rotation complete  ||                                      |
-|                                      || 06:09 WARN sandbox event contained   || PROC  144   UP  04:12:18             |
-|                                      || 07:53 INFO policy check passed       ||                                      |
-|                                      || 05:20 INFO policy check passed       ||                                      |
-|                                      || 18:54 WARN sandbox event contained   ||                                      |
-+--------------------------------------++--------------------------------------++--------------------------------------+
- Q QUIT  SPACE PAUSE  T THEME  L LAYOUT  |  SIMULATED ACTIVITY
- NETWORK ADDRESSES RESERVED FOR DOCUMENTATION  |  NO LIVE TRAFFIC
+Ubuntu 24.04 LTS | Hollywood demo | host: ubuntu-lab | kernel: 6.8.0-52-generic | up 0d 00:00:09 | sessions: 3 | load: 0
++-CODE / flow_parser.py---------------------------------++-SYSTEM LOAD-------------------------------------------------+
+|  19              protocol=raw["proto"],               || CPU [|||...........................]  11%                   |
+|  20              byte_count=int(raw.get("bytes", 0)), || MEM [|||||||||||||||||||...........]  65%                   |
+|  21          )                                        || SWP [|||...........................]  12%                   |
+|  22      raise ValueError("outside fixture range")    || Tasks: 214  thr: 620  load: 0.82 0.80 1.32  up 0d 00:00:09  |
+|  23                                                   || PID USER  PRI NI  VIRT   RES   CPU% MEM% COMMAND            |
+|  24  async def consume(stream: Iterable[dict]) -> None:| 3005 ubuntu 20  0  190M  82M  1.7  0.9 systemd-journald     |
+|  25      async for item in stream:                    |+-------------------------------------------------------------+
+|  26          record = normalize_record(item)          |+-RX/TX THROUGHPUT (eth0)-------------------------------------+
+|  27          await pipeline.submit(record)            || RX 11.1 MiB/s    TX 11.1 MiB/s                              |
+|  28          counters.flows += 1                      ||32M                                             * RX MiB/s   |
+|  29          counters.bytes += record.byte_count      ||                         **                     . TX MiB/s   |
+|  30          await metrics.flush_if_due()             ||16M  *****   ************  ............**********   *    ..  |
+|   1  from dataclasses import dataclass                ||     ......................            ..................**  |
+|>  2  from ipaddress import ip_address                 || 0                                                           |
++-------------------------------------------------------++-------------------------------------------------------------+
++-PACKET FLOW / RFC5737------------------------------------------------------------------------------------------------+
+| pps 13,419  drops 52  eth0-fixture                                                                                   |
+|UTC          SOURCE          DESTINATION      PROTO LEN                                                               |
+|14:37:24.893 192.0.2.131     198.51.100.56   TCP   451                                                                |
++----------------------------------------------------------------------------------------------------------------------+
++-KERNEL EVENTS  [dmesg -w]  [68 events, +68 new]-------++-JSON / HEX DATA-------------++-NETWORK MAP------------------+
+| [86544.2896] audit: allow subject=analyzer-03 result=ok|   "batch": "07"             ||          [relay-02]          |
+| [86544.3846] conntrack NEW 192.0.2.17>198.51.100.23   ||   "seq": 1411,              ||              |               |
+| [86544.4966] eth0: ingress fixture 100Mbit burst=128k ||   "rate": 93k/s,            ||          [core-01]           |
+| [86544.6696] WARN: sandbox threshold; alert routed    ||   "batch": "0D"             ||              |               |
+| [86544.7646] systemd[1]: Started collector.service    || buf 81 50 E3 28 1F B2 16 4B  |        [edge-01] [edge-03]   |
++-------------------------------------------------------++-----------------------------++------------------------------+
+ ^C EXIT  |  SYNTHETIC DATA  |  NO LIVE NETWORK ACTIVITY

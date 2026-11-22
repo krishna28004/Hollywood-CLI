@@ -5,32 +5,64 @@ namespace Hollywood.Engine.Modules;
 
 public sealed class DataProcessingModule : IVisualModule
 {
-    private TimeSpan elapsed;
-    private int progress;
-    private byte[] data = new byte[16];
-    public string Title => "DATA  /  SIM";
+    private readonly Queue<(string Text, byte Style)> jsonLines = new();
+    private readonly byte[] buffer = new byte[16];
+    private TimeSpan accumulated;
+    private int recordId = 1284;
+    private int progress = 64;
+    public string Title => "JSON / HEX DATA";
 
-    public void Update(TimeSpan step, DeterministicRandom random)
+    public DataProcessingModule()
     {
-        elapsed += step;
-        if (elapsed < TimeSpan.FromMilliseconds(250)) return;
-        elapsed = TimeSpan.Zero;
-        progress = (progress + 3) % 101;
-        for (var index = 0; index < data.Length; index++) data[index] = (byte)random.Next(256);
+        Enqueue("{", 0);
+        Enqueue("  \"event\": \"flow\",", 2);
+        Enqueue("  \"src\": \"192.0.2.17\",", 4);
+        Enqueue("  \"dst\": \"198.51.100.23\",", 4);
+        Enqueue("  \"proto\": \"tcp\",", 2);
+        Enqueue("  \"dport\": 443,", 0);
+        Enqueue("  \"bytes\": 1460,", 0);
+        Enqueue("  \"risk\": \"medium\",", 5);
+        Enqueue("  \"tags\": [\"tls\", \"egress\"]", 4);
+        Enqueue("}", 0);
+    }
+
+    public void Update(TimeSpan elapsed, DeterministicRandom random)
+    {
+        accumulated += elapsed;
+        while (accumulated >= TimeSpan.FromMilliseconds(185))
+        {
+            accumulated -= TimeSpan.FromMilliseconds(185);
+            progress = (progress + 3 + random.Next(7)) % 100;
+            recordId += random.Next(4) + 1;
+            for (var index = 0; index < buffer.Length; index++) buffer[index] = (byte)random.Next(256);
+            Enqueue($"  \"seq\": {recordId},", 0);
+            Enqueue($"  \"rate\": {23 + random.Next(110):D2}k/s,", 3);
+            Enqueue($"  \"batch\": \"{random.Next(16):X2}\"", 4);
+        }
     }
 
     public void Render(Canvas canvas, Rect bounds, TimeSpan elapsed)
     {
         canvas.Border(bounds, 2);
         canvas.Write(bounds.X + 2, bounds.Y, Title, 2, bounds);
-        var barWidth = Math.Max(4, Math.Min(bounds.Width - 10, 18));
-        var filled = barWidth * progress / 100;
-        canvas.Write(bounds.X + 2, bounds.Y + 2, $"BATCH-042  [{new string('#', filled)}{new string('.', barWidth - filled)}] {progress:D3}%", 1, bounds);
-        var byteCount = Math.Clamp((bounds.Width - 16) / 3, 1, data.Length);
-        var hex = string.Join(' ', data.Take(byteCount).Select(value => value.ToString("X2")));
-        canvas.Write(bounds.X + 2, bounds.Y + 4, $"00000080  {hex}", 3, bounds);
-        canvas.Write(bounds.X + 2, bounds.Y + 6, "records parsed: 001,284", 1, bounds);
+        var visibleRows = Math.Max(0, bounds.Height - 3);
+        var row = bounds.Y + 1;
+        foreach (var line in jsonLines.TakeLast(visibleRows))
+        {
+            canvas.Write(bounds.X + 2, row++, line.Text, line.Style, bounds);
+        }
+        if (row < bounds.Bottom - 1)
+        {
+            var hex = string.Join(' ', buffer.Take(8).Select(value => value.ToString("X2")));
+            canvas.Write(bounds.X + 2, row, $"buf {hex}  {progress:D2}%", 3, bounds);
+        }
     }
 
-    public void Dispose() => data = Array.Empty<byte>();
+    private void Enqueue(string text, byte style)
+    {
+        jsonLines.Enqueue((text, style));
+        while (jsonLines.Count > 48) jsonLines.Dequeue();
+    }
+
+    public void Dispose() => jsonLines.Clear();
 }

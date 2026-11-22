@@ -19,7 +19,7 @@ Check(canvas[5, 5].Character == ' ', "Control characters must not enter the cell
 canvas.Border(new Rect(1, 1, 8, 5));
 Check(canvas[1, 1].Character == '+' && canvas[8, 5].Character == '+', "Border corners were not drawn.");
 
-foreach (var count in new[] { 1, 2, 3, 6, 10 })
+foreach (var count in new[] { 1, 2, 3, 6, 7, 10 })
 for (var width = 1; width <= 240; width++)
 for (var height = 1; height <= 80; height++)
 {
@@ -116,13 +116,13 @@ IVisualModule[] modules =
     new DataProcessingModule(), new SecurityFeedModule(), new SystemMetricsModule(),
     new BuildLogsModule(), new AsciiWaveModule(), new NetworkTopologyModule(), new DashboardMetricsModule()
 ];
-var flagshipLayout = LayoutSolver.Solve(120, 30, 6);
+var flagshipLayout = LayoutSolver.Solve(120, 30, 7);
 var flagship = new Canvas(120, 30);
 var moduleRandom = new DeterministicRandom(9876);
 foreach (var module in modules) module.Update(TimeSpan.FromSeconds(3), moduleRandom);
 for (var index = 0; index < flagshipLayout.Count; index++) modules[index].Render(flagship, flagshipLayout[index], TimeSpan.FromSeconds(3));
 var flagshipText = flagship.ToPlainText();
-foreach (var module in modules.Take(6)) Check(flagshipText.Contains(module.Title, StringComparison.Ordinal), $"Flagship panel missing title {module.Title}.");
+foreach (var module in modules.Take(7)) Check(flagshipText.Contains(module.Title, StringComparison.Ordinal), $"Flagship panel missing title {module.Title}.");
 var denseLayout = LayoutSolver.Solve(160, 45, 10);
 var dense = new Canvas(160, 45);
 for (var index = 0; index < denseLayout.Count; index++) modules[index].Render(dense, denseLayout[index], TimeSpan.FromSeconds(3));
@@ -130,4 +130,4 @@ var denseText = dense.ToPlainText();
 foreach (var module in modules) Check(denseText.Contains(module.Title, StringComparison.Ordinal), $"Dense view missing title {module.Title}.");
 foreach (var module in modules) module.Dispose();
 
-Console.WriteLine("PASS: clipping, borders, 96,000 layout cases, six/ten-panel layouts, ten modules, VT diffing, bottom-right protection, deterministic PRNG, five-theme configuration validation");
+Console.WriteLine("PASS: clipping, borders, 96,000 layout cases, flagship seven-panel and dense ten-panel layouts, ten modules, VT diffing, bottom-right protection, deterministic PRNG, five-theme configuration validation");

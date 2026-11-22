@@ -112,32 +112,29 @@ def main():
 
     session = Session(executable)
     try:
-        session.wait_for("HOLLYWOOD")
+        session.wait_for("Ubuntu 24.04")
         terminal_attributes = termios.tcgetattr(session.master)
         if terminal_attributes[3] & (termios.ICANON | termios.ECHO):
             raise AssertionError("interactive adapter did not enable noncanonical, no-echo input")
         session.read_for(0.3)
-        if b"HOLLYWOOD" not in session.output:
+        if b"Hollywood demo" not in session.output:
             raise AssertionError("scene header was not captured")
 
-        session.send(b" ")
-        session.wait_for("RESUME", offset=len(visible_text(session.output)))
-        session.read_for(0.3)
-        paused_bytes = len(session.output)
-        session.read_for(0.3)
-        if len(session.output) != paused_bytes:
-            raise AssertionError("terminal output changed while paused")
-
-        session.send(b" ")
-        session.wait_for("PAUSE", offset=len(visible_text(session.output)), timeout=3)
+        before_keys = len(session.output)
+        session.send(b"qtlxyz \x1b")
+        session.read_for(0.8)
+        if session.exit_code() is not None:
+            raise AssertionError("an ordinary key exited the simulation; only Ctrl+C should stop it")
+        if len(session.output) <= before_keys:
+            raise AssertionError("animation stopped after ordinary keys were pressed")
 
         session.set_size(12, 5)
         session.wait_for("RESIZE")
         session.set_size(120, 30)
         session.read_for(0.3)
-        session.send(b"q")
-        if session.wait_exit() != 0:
-            raise AssertionError("Q did not exit with status 0")
+        session.send(b"\x03")
+        if session.wait_exit() != 130:
+            raise AssertionError("Ctrl+C did not exit with status 130")
         if b"\x1b[?25h" not in session.output:
             raise AssertionError("cursor-show restoration was not emitted")
     finally:
@@ -145,16 +142,20 @@ def main():
 
     escape = Session(executable)
     try:
-        escape.wait_for("HOLLYWOOD")
+        escape.wait_for("Ubuntu 24.04")
         escape.send(b"\x1b")
-        if escape.wait_exit() != 0:
-            raise AssertionError("Escape did not exit with status 0")
+        escape.read_for(0.5)
+        if escape.exit_code() is not None:
+            raise AssertionError("Escape should be ignored; Ctrl+C is the only keyboard exit")
+        escape.send(b"\x03")
+        if escape.wait_exit() != 130:
+            raise AssertionError("Ctrl+C did not exit after Escape was ignored")
     finally:
         escape.close()
 
     interrupt = Session(executable)
     try:
-        interrupt.wait_for("HOLLYWOOD")
+        interrupt.wait_for("Ubuntu 24.04")
         interrupt.send(b"\x03")
         if interrupt.wait_exit() != 130:
             raise AssertionError("Ctrl+C did not exit with status 130")
@@ -165,7 +166,7 @@ def main():
 
     terminate = Session(executable)
     try:
-        terminate.wait_for("HOLLYWOOD")
+        terminate.wait_for("Ubuntu 24.04")
         os.kill(terminate.pid, signal.SIGTERM)
         if terminate.wait_exit() != 143:
             raise AssertionError("SIGTERM did not exit with status 143")
@@ -174,7 +175,7 @@ def main():
     finally:
         terminate.close()
 
-    print("PASS: POSIX PTY scene, animation, pause/resume, resize, Q/Escape/Ctrl+C/SIGTERM, cursor restoration")
+    print("PASS: POSIX PTY scene, animation, ignored ordinary keys, resize, Ctrl+C/SIGTERM, cursor restoration")
     return 0
 
 

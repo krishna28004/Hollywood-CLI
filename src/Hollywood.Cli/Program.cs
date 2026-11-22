@@ -108,24 +108,15 @@ internal static class Program
         var renderer = new VtRenderer(terminal.Output) { ThemeIndex = options.Theme, ColorMode = ResolveColorMode(options.ColorMode) };
         var clock = Stopwatch.StartNew();
         var previous = clock.Elapsed;
-        var paused = false;
         var requestedCount = options.Panels;
-        var theme = options.Theme;
         var interval = TimeSpan.FromSeconds(1d / options.FrameRate);
 
         while (!token.IsCancellationRequested)
         {
             var frameStart = clock.Elapsed;
-            while (terminal.TryReadKey(out var key))
-            {
-                if (key is ConsoleKey.Q or ConsoleKey.Escape) return;
-                if (key == ConsoleKey.Spacebar)
-                {
-                    paused = !paused;
-                }
-                if (key == ConsoleKey.T) { theme = (theme + 1) % 5; renderer.ThemeIndex = theme; renderer.Invalidate(); }
-                if (key == ConsoleKey.L) requestedCount = requestedCount switch { 2 => 3, 3 => 6, 6 => 10, _ => 2 };
-            }
+            // Drain ordinary keys so they cannot accumulate. Ctrl+C is delivered through
+            // the host's processed-input/signal path and remains the only keyboard action.
+            while (terminal.TryReadKey(out _)) { }
 
             terminal.RefreshSize();
             var now = clock.Elapsed;
@@ -134,10 +125,10 @@ internal static class Program
             if (options.ReducedMotion) elapsed = Scale(elapsed, 0.35);
             else elapsed = Scale(elapsed, options.Speed switch { "slow" => 0.6, "fast" => 1.7, _ => 1.0 });
             var activeCount = Math.Min(VisiblePanelCount(terminal.Width, terminal.Height, requestedCount), modules.Length);
-            if (!paused && activeCount > 0)
+            if (activeCount > 0)
                 for (var index = 0; index < activeCount; index++) modules[index].Update(elapsed, random);
 
-            RenderFrame(terminal.Width, terminal.Height, modules, activeCount, paused, theme, clock.Elapsed, renderer);
+            RenderFrame(terminal.Width, terminal.Height, modules, activeCount, clock.Elapsed, options, renderer);
             var remaining = interval - (clock.Elapsed - frameStart);
             if (remaining > TimeSpan.Zero) Thread.Sleep(remaining);
         }
@@ -168,22 +159,23 @@ internal static class Program
         return requested;
     }
 
-    private static void RenderFrame(int width, int height, IVisualModule[] modules, int activeCount, bool paused, int theme, TimeSpan elapsed, VtRenderer renderer)
+    private static void RenderFrame(int width, int height, IVisualModule[] modules, int activeCount, TimeSpan elapsed, Options options, VtRenderer renderer)
     {
         if (width < 20 || height < 7)
         {
             var tiny = new Canvas(width, height);
-            tiny.Write(0, 0, "RESIZE  |  Q QUIT");
+            tiny.Write(0, 0, "RESIZE  |  CTRL+C EXIT");
             renderer.Write(tiny);
             return;
         }
 
         var canvas = new Canvas(width, height);
         var rects = LayoutSolver.Solve(width, height, activeCount);
-        canvas.Write(1, 0, $"HOLLYWOOD  |  SIMULATION  |  THEME {ThemeName(theme)}  |  {activeCount} PANELS", 2);
+        var seconds = (long)elapsed.TotalSeconds;
+        var load = 0.7 + 0.25 * Math.Sin(elapsed.TotalSeconds * 0.19);
+        canvas.Write(0, 0, $"Ubuntu 24.04 LTS | Hollywood demo | host: ubuntu-lab | kernel: 6.8.0-52-generic | up {seconds / 86400:D1}d {seconds / 3600 % 24:D2}:{seconds / 60 % 60:D2}:{seconds % 60:D2} | sessions: 3 | load: {load:0.00} {load + 0.04:0.00} {load + 0.11:0.00} | eth0: up | {DateTime.UtcNow:HH:mm:ss} UTC", 0);
         for (var i = 0; i < rects.Count; i++) modules[i].Render(canvas, rects[i], elapsed);
-        canvas.Write(1, height - 2, $"Q QUIT  SPACE {(paused ? "RESUME" : "PAUSE")}  T THEME  L LAYOUT  |  SIMULATED ACTIVITY", 2);
-        canvas.Write(1, height - 1, "NETWORK ADDRESSES RESERVED FOR DOCUMENTATION  |  NO LIVE TRAFFIC", 1);
+        canvas.Write(1, height - 1, "^C EXIT  |  SYNTHETIC DATA  |  NO LIVE NETWORK ACTIVITY", 4);
         renderer.Write(canvas);
     }
 
@@ -197,10 +189,9 @@ internal static class Program
             var canvas = new Canvas(width, height);
             var rects = LayoutSolver.Solve(width, height, options.Panels);
             for (var tick = 0; tick < 18; tick++) foreach (var module in modules) module.Update(TimeSpan.FromMilliseconds(500), random);
-            canvas.Write(1, 0, $"HOLLYWOOD  |  SIMULATION  |  {ThemeName(options.Theme)}  |  {options.Panels} PANELS", 2);
             for (var index = 0; index < Math.Min(rects.Count, modules.Length); index++) modules[index].Render(canvas, rects[index], TimeSpan.FromSeconds(9));
-            canvas.Write(1, height - 2, "Q QUIT  SPACE PAUSE  T THEME  L LAYOUT  |  SIMULATED ACTIVITY", 2);
-            canvas.Write(1, height - 1, "NETWORK ADDRESSES RESERVED FOR DOCUMENTATION  |  NO LIVE TRAFFIC", 1);
+            canvas.Write(0, 0, $"Ubuntu 24.04 LTS | Hollywood demo | host: ubuntu-lab | kernel: 6.8.0-52-generic | up 0d 00:00:09 | sessions: 3 | load: 0.72 0.76 0.83 | eth0: up | 14:37:20 UTC", 0);
+            canvas.Write(1, height - 1, "^C EXIT  |  SYNTHETIC DATA  |  NO LIVE NETWORK ACTIVITY", 4);
             Console.WriteLine(canvas.ToPlainText());
         }
         finally { foreach (var module in modules) module.Dispose(); }
@@ -235,10 +226,10 @@ internal static class Program
                         if (themeOverride < 0) { error = "Theme must be classic, cyberpunk, soc, matrix, or retro."; options = default!; return false; }
                         break;
                     case "--panels":
-                        if (!int.TryParse(value, out var panelCount) || panelCount is not (2 or 3 or 6 or 10)) { error = "Panel count must be 2, 3, 6, or 10."; options = default!; return false; }
+                        if (!int.TryParse(value, out var panelCount) || panelCount is not (2 or 3 or 6 or 7 or 10)) { error = "Panel count must be 2, 3, 6, 7, or 10."; options = default!; return false; }
                         panelsOverride = panelCount; break;
                     case "--layout":
-                        panelsOverride = value.ToLowerInvariant() switch { "focus" => 2, "auto" => 6, "dense" => 10, _ => -1 };
+                        panelsOverride = value.ToLowerInvariant() switch { "focus" => 2, "auto" => 7, "dense" => 10, _ => -1 };
                         if (panelsOverride < 0) { error = "Layout must be auto, focus, or dense."; options = default!; return false; }
                         break;
                     case "--seed":
@@ -290,15 +281,15 @@ internal static class Program
     private static string ThemeKey(int theme) => theme switch { 0 => "classic", 1 => "cyberpunk", 2 => "soc", 3 => "matrix", 4 => "retro", _ => "" };
     private static string ThemeName(int theme) => theme switch { 1 => "CYBERPUNK", 2 => "SOC", 3 => "MATRIX", 4 => "RETRO AMBER", _ => "CLASSIC" };
 
-    private static void PrintHelp() => Console.WriteLine($"Hollywood CLI {Version}\n\nUsage: hollywood [--help|--version|--snapshot] [--config PATH|--no-config] [--theme classic|cyberpunk|soc|matrix|retro] [--panels 2|3|6|10] [--layout auto|focus|dense] [--speed slow|normal|fast] [--fps 1..60] [--reduced-motion] [--seed N]\n\nConfig: hollywood config path|show|validate [PATH]\nInteractive keys: Q/Esc quit, Space pause/resume, T theme, L layout.\nAll displayed activity is simulated.");
+    private static void PrintHelp() => Console.WriteLine($"Hollywood CLI {Version}\n\nUsage: hollywood [--help|--version|--snapshot] [--config PATH|--no-config] [--theme classic|cyberpunk|soc|matrix|retro] [--panels 2|3|6|7|10] [--layout auto|focus|dense] [--speed slow|normal|fast] [--fps 1..60] [--reduced-motion] [--seed N]\n\nConfig: hollywood config path|show|validate [PATH]\nInteractive key: Ctrl+C exits. Other keys are ignored.\nAll displayed activity is synthetic; no network traffic is sent.");
 
     private static IVisualModule[] CreateModules(string[] enabled)
     {
         var all = new (string Id, IVisualModule Module)[]
         {
-            ("code", new CodeStreamModule()), ("network", new NetworkTrafficModule()), ("rain", new DigitalRainModule()),
-            ("data", new DataProcessingModule()), ("security", new SecurityFeedModule()), ("system", new SystemMetricsModule()),
-            ("build", new BuildLogsModule()), ("wave", new AsciiWaveModule()), ("topology", new NetworkTopologyModule()), ("dashboard", new DashboardMetricsModule())
+            ("code", new CodeStreamModule()), ("system", new SystemMetricsModule()), ("wave", new AsciiWaveModule()),
+            ("network", new NetworkTrafficModule()), ("security", new SecurityFeedModule()), ("data", new DataProcessingModule()),
+            ("topology", new NetworkTopologyModule()), ("build", new BuildLogsModule()), ("dashboard", new DashboardMetricsModule()), ("rain", new DigitalRainModule())
         };
         var selected = all.Where(item => enabled.Contains(item.Id, StringComparer.Ordinal)).Select(item => item.Module).ToArray();
         foreach (var item in all.Where(item => !enabled.Contains(item.Id, StringComparer.Ordinal))) item.Module.Dispose();
