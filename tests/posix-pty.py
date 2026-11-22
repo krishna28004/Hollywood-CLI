@@ -106,6 +106,9 @@ def main():
     session = Session(executable)
     try:
         session.wait_for("HOLLYWOOD")
+        terminal_attributes = termios.tcgetattr(session.master)
+        if terminal_attributes[3] & (termios.ICANON | termios.ECHO):
+            raise AssertionError("interactive adapter did not enable noncanonical, no-echo input")
         session.read_for(0.3)
         if b"HOLLYWOOD" not in session.output:
             raise AssertionError("scene header was not captured")
