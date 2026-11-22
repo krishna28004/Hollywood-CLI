@@ -5,6 +5,7 @@ import errno
 import fcntl
 import os
 import pty
+import re
 import select
 import signal
 import subprocess
@@ -13,13 +14,18 @@ import sys
 import termios
 import time
 
+ANSI_SEQUENCE = re.compile(rb"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1b\\))")
+
+
+def visible_text(data):
+    return ANSI_SEQUENCE.sub(b"", data)
+
 
 class Session:
     def __init__(self, executable, columns=80, rows=24):
         self.pid, self.master = pty.fork()
         if self.pid == 0:
             os.environ.setdefault("TERM", "xterm-256color")
-            os.environ["HOLLYWOOD_TRACE_KEYS"] = "1"
             os.execv(executable, [executable])
         self.output = bytearray()
         self.status = None
@@ -51,14 +57,12 @@ class Session:
         encoded = token.encode()
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
-            if encoded in self.output[offset:]:
+            if encoded in visible_text(self.output)[offset:]:
                 return
             if self.exit_code() is not None:
                 raise AssertionError(f"process exited before {token!r}: {self.exit_code()}")
             self.read_for(0.05)
-        trace = bytes(self.output).decode("utf-8", errors="replace")
-        key_events = [part for part in trace.split("[[HOLLYWOOD_KEY:")[1:] if "]]" in part]
-        raise AssertionError(f"timed out waiting for {token!r}; key events: {key_events[-5:]}")
+        raise AssertionError(f"timed out waiting for visible text {token!r}")
 
     def send(self, data):
         os.write(self.master, data)
@@ -117,7 +121,7 @@ def main():
             raise AssertionError("scene header was not captured")
 
         session.send(b" ")
-        session.wait_for("SPACE RESUME", offset=len(session.output))
+        session.wait_for("SPACE RESUME", offset=len(visible_text(session.output)))
         session.read_for(0.3)
         paused_bytes = len(session.output)
         session.read_for(0.3)
@@ -125,7 +129,7 @@ def main():
             raise AssertionError("terminal output changed while paused")
 
         session.send(b" ")
-        session.wait_for("SPACE PAUSE", offset=paused_bytes, timeout=3)
+        session.wait_for("SPACE PAUSE", offset=len(visible_text(session.output)), timeout=3)
 
         session.set_size(12, 5)
         session.wait_for("RESIZE")

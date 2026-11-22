@@ -90,8 +90,6 @@ internal sealed class PosixTerminalSession : ITerminalSession
     {
         key = default;
         if (ReadByte(0, out var input) != 1) return false;
-        if (Environment.GetEnvironmentVariable("HOLLYWOOD_TRACE_KEYS") == "1")
-            Console.Error.Write($"[[HOLLYWOOD_KEY:{input}]]");
         key = input switch
         {
             (byte)'q' or (byte)'Q' => ConsoleKey.Q,
