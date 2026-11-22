@@ -31,7 +31,7 @@ Do not change termios through direct P/Invoke in the initial adapter. Linux and 
 ## Validation required
 
 - Build and run the PTY integration harness on Ubuntu x64/ARM64 and macOS Intel/Apple Silicon runners.
-- Verify Q, Escape, Space pause/resume, resize, Ctrl+C/SIGINT, SIGTERM, and restoration sequences.
+- Verify ordinary keys are ignored, resize works, Ctrl+C/SIGINT and SIGTERM shut down, and terminal state is restored.
 - Verify Windows x64 ConPTY regression after every shared CLI change; retain Windows ARM64 CI coverage.
 - Follow with direct real-terminal testing; PTY success is not a substitute for GNOME Terminal, Konsole, SSH/tmux, Terminal.app, or iTerm2 validation.
 

@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Cross-platform milestone C2/C3. Status: **IN PROGRESS**; the POSIX implementation, tests, and six-RID CI are authored but have not yet executed on Linux/macOS. Windows ConPTY and performance/direct-host validation remain outstanding.
+Cross-platform milestone C2/C3. Status: **IN PROGRESS**; the POSIX implementation, tests, and six-RID CI are authored. Current Linux/macOS CI validation and direct terminal-host checks remain release gates. Updated Windows x64 ConPTY verification has passed; performance benchmarks remain outstanding.
 
 ## Completed in this work cycle
 
@@ -11,6 +11,7 @@ Cross-platform milestone C2/C3. Status: **IN PROGRESS**; the POSIX implementatio
 - Added `config path`, `config show`, `config validate`, `--config`, and `--no-config`.
 - Added Retro Amber as the fifth theme, 16-color/truecolor/mono renderer modes, animation speed, frame cap, reduced motion, and enabled-module selection.
 - Updated user documentation and added a sample configuration.
+- Refreshed the flagship visual experience to a seven-panel, Ubuntu-style operations layout, with syntax-colored code, compact network graphs/feeds, system process output, event logs, data, and topology. Only Ctrl+C exits; ordinary keys are drained and ignored.
 - Built a local portable Windows x64 ZIP and SHA-256 manifest. These are ignored artifacts, not source history.
 - Initialized a separate project-local Git repository. Its ignore rules exclude the local research folder, build outputs, and artifacts.
 - Completed the cross-platform audit and introduced `ITerminalSession`, retaining the Windows Win32 adapter while adding a shared POSIX adapter, POSIX SIGTERM cancellation, conservative color fallback, and platform-specific config paths.
@@ -21,13 +22,13 @@ Cross-platform milestone C2/C3. Status: **IN PROGRESS**; the POSIX implementatio
 - Release build and current console test harness passed after the changes, with zero compiler warnings/errors.
 - The harness covers 96,000 layout cases, renderer behavior, deterministic random streams, config round-tripping, invalid schema/value/unknown/duplicate properties, and theme palette output.
 - CLI help, a Retro Amber dense snapshot, sample config validation, and rejection of a missing explicitly selected config were exercised.
-- Added and ran a Windows ConPTY harness against the self-contained single-file x64 executable. The latest run captured a live scene and 2,678 additional bytes over 700 ms; verified pause/resume; resized to 42×12, 12×5, and 120×30; observed the tiny fallback; sent Q, Escape, and ETX/Ctrl+C to separate launches; and verified cursor-show output and exit codes (0/130). One earlier resumed-output timing check failed and was corrected to poll for a bounded interval; the corrected harness passed on rerun.
+- Rebuilt and ran the updated Windows ConPTY harness against a self-contained single-file x64 executable. The latest run captured a live scene and 7,590 additional VT bytes over 700 ms; confirmed letters, Space, and Escape did not stop animation; resized to 42×12, 12×5, and 120×30; and confirmed the tiny fallback, Ctrl+C exit code 130, and cursor-show restoration.
 - Windows UI automation initialization timed out. No direct interactive Windows Terminal/Console Host claim is made.
 
 ## Bugs found and addressed
 
 - An invalid array initializer introduced during module selection failed the first build; corrected and rebuilt.
-- The saved configuration layout was not used to select the default panel count; now `focus` and `dense` select their panel presets unless CLI panel/layout arguments override them.
+- `--layout auto` selected six panels even though the new default scene uses seven; the auto preset now resolves to seven.
 - An explicit missing config path previously fell back to defaults; it now fails before terminal acquisition.
 - Panel rendering is capped to the number of enabled modules.
 - Initial ConPTY testing found console standard streams can be non-console handles even though `CONOUT$`/`CONIN$` exist. Terminal acquisition now falls back to those console device handles and reads keyboard events from the Win32 console input queue.

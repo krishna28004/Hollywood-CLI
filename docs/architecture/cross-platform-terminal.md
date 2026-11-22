@@ -64,7 +64,7 @@ Current assumptions to validate:
 3. .NET's `Console.WindowWidth` and `WindowHeight` observe SIGWINCH-driven PTY size changes on both Linux and macOS.
 4. ConPTY/Windows behavior remains unchanged after introducing the factory and interface.
 
-Experiments: run the Python stdlib PTY test on Ubuntu and macOS runners; run ConPTY on Windows x64 and ARM64; then inspect Windows Terminal, Console Host, GNOME Terminal, Konsole, SSH/tmux, Terminal.app, and iTerm2 manually. The harness verifies scene output, animation, pause/resume, resize, Q/Escape/Ctrl+C, and cursor-show output. It cannot substitute for those visible terminal checks.
+Experiments: run the Python stdlib PTY test on Ubuntu and macOS runners; run ConPTY on Windows x64 and ARM64; then inspect Windows Terminal, Console Host, GNOME Terminal, Konsole, SSH/tmux, Terminal.app, and iTerm2 manually. The harness verifies scene output, animation, ignored ordinary keys, resize, Ctrl+C, and cursor-show output. It cannot substitute for those visible terminal checks.
 
 ## Deployment notes
 

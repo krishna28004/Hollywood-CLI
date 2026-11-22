@@ -2,7 +2,7 @@
 
 ## High priority
 
-- Direct Windows Terminal/Console Host behavior remains unverified. ConPTY confirms scene output, pause/resume, ETX/Ctrl+C cancellation, Q/Escape, tiny/rapid resize, and cursor-show restoration.
+- Direct Windows Terminal/Console Host behavior remains unverified. Updated ConPTY confirms the seven-panel scene, animation after ignored ordinary keys, 12×5 resize fallback, ETX/Ctrl+C cancellation, and cursor-show restoration.
 - Linux/macOS adapter, PTY harness, and native runner matrix are implemented but unexecuted on those operating systems; do not advertise cross-platform compatibility until native evidence passes.
 - `TerminalLease.Dispose` swallows terminal restoration write failures; cleanup status is not surfaced yet.
 - No performance benchmark exists.
