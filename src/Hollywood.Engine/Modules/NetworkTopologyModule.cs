@@ -25,8 +25,8 @@ public sealed class NetworkTopologyModule : IVisualModule
 
     public void Render(Canvas canvas, Rect bounds, TimeSpan elapsed)
     {
-        canvas.Border(bounds, 2);
-        canvas.Write(bounds.X + 2, bounds.Y, Title, 2, bounds);
+        canvas.Border(bounds, 6);
+        canvas.Write(bounds.X + 2, bounds.Y, Title, 1, bounds);
         if (bounds.Height < 6) return;
 
         var center = bounds.X + bounds.Width / 2;

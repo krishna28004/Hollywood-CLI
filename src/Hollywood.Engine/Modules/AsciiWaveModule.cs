@@ -40,8 +40,8 @@ public sealed class AsciiWaveModule : IVisualModule
 
     public void Render(Canvas canvas, Rect bounds, TimeSpan elapsed)
     {
-        canvas.Border(bounds, 2);
-        canvas.Write(bounds.X + 2, bounds.Y, Title, 2, bounds);
+        canvas.Border(bounds, 6);
+        canvas.Write(bounds.X + 2, bounds.Y, Title, 1, bounds);
         canvas.Write(bounds.X + 2, bounds.Y + 1, $"RX {rxRate,2}.{rxRate % 10} MiB/s    TX {txRate,2}.{txRate % 10} MiB/s", 3, bounds);
         var graphTop = bounds.Y + 2;
         var graphBottom = bounds.Bottom - 2;

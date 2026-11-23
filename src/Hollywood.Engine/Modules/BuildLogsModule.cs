@@ -24,8 +24,8 @@ public sealed class BuildLogsModule : IVisualModule
 
     public void Render(Canvas canvas, Rect bounds, TimeSpan elapsed)
     {
-        canvas.Border(bounds, 2);
-        canvas.Write(bounds.X + 2, bounds.Y, Title, 2, bounds);
+        canvas.Border(bounds, 6);
+        canvas.Write(bounds.X + 2, bounds.Y, Title, 1, bounds);
         var row = bounds.Y + 2;
         foreach (var line in lines.Reverse())
         {

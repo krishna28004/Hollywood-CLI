@@ -30,7 +30,7 @@ public sealed class SecurityFeedModule : IVisualModule
 
     public SecurityFeedModule()
     {
-        for (var index = 0; index < 10; index++) AddEntry(Events[index], (byte)(index == 0 || index == 8 ? 4 : index == 1 ? 2 : 0));
+        for (var index = 0; index < 10; index++) AddEntry(Events[index], (byte)(index == 0 || index == 8 ? 5 : index == 1 ? 2 : 0));
     }
 
     public void Update(TimeSpan elapsed, DeterministicRandom random)
@@ -50,8 +50,8 @@ public sealed class SecurityFeedModule : IVisualModule
 
     public void Render(Canvas canvas, Rect bounds, TimeSpan elapsed)
     {
-        canvas.Border(bounds, 2);
-        canvas.Write(bounds.X + 2, bounds.Y, $"{Title}  [{sequence:D2} events, +{pendingLines} new]", 2, bounds);
+        canvas.Border(bounds, 6);
+        canvas.Write(bounds.X + 2, bounds.Y, $"{Title}  [{sequence:D2} events, +{pendingLines} new]", 1, bounds);
         var row = bounds.Y + 1;
         var end = bounds.Bottom - 1;
         foreach (var entry in entries)

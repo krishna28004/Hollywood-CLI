@@ -35,8 +35,8 @@ public sealed class SystemMetricsModule : IVisualModule
 
     public void Render(Canvas canvas, Rect bounds, TimeSpan elapsed)
     {
-        canvas.Border(bounds, 2);
-        canvas.Write(bounds.X + 2, bounds.Y, Title, 2, bounds);
+        canvas.Border(bounds, 6);
+        canvas.Write(bounds.X + 2, bounds.Y, Title, 1, bounds);
         if (bounds.Height < 5) return;
 
         DrawMeter(canvas, bounds, bounds.Y + 1, "CPU", cpu, 3);

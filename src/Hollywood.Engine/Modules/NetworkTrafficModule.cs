@@ -36,8 +36,8 @@ public sealed class NetworkTrafficModule : IVisualModule
 
     public void Render(Canvas canvas, Rect bounds, TimeSpan elapsed)
     {
-        canvas.Border(bounds, 2);
-        canvas.Write(bounds.X + 2, bounds.Y, Title, 2, bounds);
+        canvas.Border(bounds, 6);
+        canvas.Write(bounds.X + 2, bounds.Y, Title, 1, bounds);
         if (bounds.Height < 3) return;
         canvas.Write(bounds.X + 2, bounds.Y + 1, $"pps {packetRate:N0}  drops {drops}  eth0-fixture", 0, bounds);
 
@@ -49,7 +49,7 @@ public sealed class NetworkTrafficModule : IVisualModule
         foreach (var packet in packets.TakeLast(Math.Max(0, rowLimit - row)))
         {
             canvas.Write(x, row, packet.Time.PadRight(13), 0, bounds);
-            canvas.Write(x + 13, row, packet.Source.PadRight(16), 2, bounds);
+            canvas.Write(x + 13, row, packet.Source.PadRight(16), 7, bounds);
             canvas.Write(x + 29, row, packet.Destination.PadRight(16), 2, bounds);
             canvas.Write(x + 45, row, packet.Protocol.PadRight(5), packet.Protocol is "TLS" or "DNS" ? (byte)5 : (byte)3, bounds);
             canvas.Write(x + 50, row++, $"{packet.Length,4}", 0, bounds);

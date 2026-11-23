@@ -60,11 +60,19 @@ var themedRenderer = new VtRenderer(themedCapture) { ThemeIndex = 4 };
 var themedCanvas = new Canvas(6, 2);
 themedCanvas.Write(0, 0, "AMBER", 2);
 themedRenderer.Write(themedCanvas);
-Check(themedCapture.ToString().Contains("38;5;214", StringComparison.Ordinal), "Retro Amber theme did not emit its palette.");
+Check(themedCapture.ToString().Contains("38;5;220", StringComparison.Ordinal), "Retro Amber theme did not emit its palette.");
 themedCapture.GetStringBuilder().Clear();
 themedRenderer = new VtRenderer(themedCapture) { ThemeIndex = 4, ColorMode = "truecolor" };
 themedRenderer.Write(themedCanvas);
-Check(themedCapture.ToString().Contains("38;2;255;170;35", StringComparison.Ordinal), "Truecolor palette was not emitted.");
+Check(themedCapture.ToString().Contains("38;2;255;190;60", StringComparison.Ordinal), "Truecolor palette was not emitted.");
+themedCapture.GetStringBuilder().Clear();
+var socRenderer = new VtRenderer(themedCapture) { ThemeIndex = 2, ColorMode = "truecolor" };
+var socCanvas = new Canvas(8, 1);
+socCanvas.Write(0, 0, "LIME CYAN", 1);
+socCanvas.Write(4, 0, "CYAN", 2);
+socRenderer.Write(socCanvas);
+Check(themedCapture.ToString().Contains("38;2;57;255;110", StringComparison.Ordinal)
+    && themedCapture.ToString().Contains("38;2;35;235;220", StringComparison.Ordinal), "SOC palette did not emit distinct lime and cyan accents.");
 
 var first = new DeterministicRandom(12345);
 var second = new DeterministicRandom(12345);

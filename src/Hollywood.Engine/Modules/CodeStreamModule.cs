@@ -76,8 +76,8 @@ public sealed class CodeStreamModule : IVisualModule
 
     public void Render(Canvas canvas, Rect bounds, TimeSpan elapsed)
     {
-        canvas.Border(bounds, 2);
-        canvas.Write(bounds.X + 2, bounds.Y, Title, 2, bounds);
+        canvas.Border(bounds, 6);
+        canvas.Write(bounds.X + 2, bounds.Y, Title, 1, bounds);
         var source = Listings[listingIndex].Lines;
         var visibleRows = Math.Max(0, bounds.Height - 2);
         for (var row = 0; row < visibleRows; row++)
@@ -87,7 +87,7 @@ public sealed class CodeStreamModule : IVisualModule
             var y = bounds.Y + 1 + row;
             var current = row == visibleRows - 1;
             canvas.Write(bounds.X + 1, y, current ? ">" : " ", 3, bounds);
-            canvas.Write(bounds.X + 2, y, $"{sourceIndex + 1,3} ", 1, bounds);
+            canvas.Write(bounds.X + 2, y, $"{sourceIndex + 1,3} ", 6, bounds);
             canvas.Write(bounds.X + 7, y, text, StyleFor(text), bounds);
         }
     }
@@ -95,11 +95,14 @@ public sealed class CodeStreamModule : IVisualModule
     private static byte StyleFor(string line)
     {
         var trimmed = line.TrimStart();
-        if (trimmed.StartsWith("#", StringComparison.Ordinal) || trimmed.StartsWith("//", StringComparison.Ordinal)) return 4;
+        if (trimmed.StartsWith("#", StringComparison.Ordinal) || trimmed.StartsWith("//", StringComparison.Ordinal)) return 1;
         if (trimmed.StartsWith("def ", StringComparison.Ordinal) || trimmed.StartsWith("class ", StringComparison.Ordinal)
             || trimmed.StartsWith("async ", StringComparison.Ordinal) || trimmed.StartsWith("fn ", StringComparison.Ordinal)
-            || trimmed.StartsWith("function ", StringComparison.Ordinal) || trimmed.StartsWith("internal ", StringComparison.Ordinal)) return 2;
-        if (line.Contains('"') || line.Contains('\'')) return 4;
+            || trimmed.StartsWith("function ", StringComparison.Ordinal) || trimmed.StartsWith("internal ", StringComparison.Ordinal)
+            || trimmed.StartsWith("use ", StringComparison.Ordinal) || trimmed.StartsWith("using ", StringComparison.Ordinal)) return 2;
+        if (line.Contains('"') || line.Contains('\'')) return 3;
+        if (trimmed.StartsWith("return ", StringComparison.Ordinal) || trimmed.StartsWith("raise ", StringComparison.Ordinal)
+            || trimmed.StartsWith("if ", StringComparison.Ordinal) || trimmed.StartsWith("while ", StringComparison.Ordinal)) return 4;
         return 0;
     }
 

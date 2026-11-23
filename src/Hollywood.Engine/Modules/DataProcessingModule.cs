@@ -16,8 +16,8 @@ public sealed class DataProcessingModule : IVisualModule
     {
         Enqueue("{", 0);
         Enqueue("  \"event\": \"flow\",", 2);
-        Enqueue("  \"src\": \"192.0.2.17\",", 4);
-        Enqueue("  \"dst\": \"198.51.100.23\",", 4);
+        Enqueue("  \"src\": \"192.0.2.17\",", 7);
+        Enqueue("  \"dst\": \"198.51.100.23\",", 7);
         Enqueue("  \"proto\": \"tcp\",", 2);
         Enqueue("  \"dport\": 443,", 0);
         Enqueue("  \"bytes\": 1460,", 0);
@@ -43,8 +43,8 @@ public sealed class DataProcessingModule : IVisualModule
 
     public void Render(Canvas canvas, Rect bounds, TimeSpan elapsed)
     {
-        canvas.Border(bounds, 2);
-        canvas.Write(bounds.X + 2, bounds.Y, Title, 2, bounds);
+        canvas.Border(bounds, 6);
+        canvas.Write(bounds.X + 2, bounds.Y, Title, 1, bounds);
         var visibleRows = Math.Max(0, bounds.Height - 3);
         var row = bounds.Y + 1;
         foreach (var line in jsonLines.TakeLast(visibleRows))

@@ -173,9 +173,10 @@ internal static class Program
         var rects = LayoutSolver.Solve(width, height, activeCount);
         var seconds = (long)elapsed.TotalSeconds;
         var load = 0.7 + 0.25 * Math.Sin(elapsed.TotalSeconds * 0.19);
-        canvas.Write(0, 0, $"Ubuntu 24.04 LTS | Hollywood demo | host: ubuntu-lab | kernel: 6.8.0-52-generic | up {seconds / 86400:D1}d {seconds / 3600 % 24:D2}:{seconds / 60 % 60:D2}:{seconds % 60:D2} | sessions: 3 | load: {load:0.00} {load + 0.04:0.00} {load + 0.11:0.00} | eth0: up | {DateTime.UtcNow:HH:mm:ss} UTC", 0);
+        canvas.Write(0, 0, "UBUNTU 24.04 // HOLLYWOOD SIM |", 1);
+        canvas.Write(32, 0, $"node: ubuntu-lab | kernel: 6.8.0-52 | up {seconds / 86400:D1}d {seconds / 3600 % 24:D2}:{seconds / 60 % 60:D2}:{seconds % 60:D2} | sessions: 3 | load: {load:0.00} {load + 0.04:0.00} {load + 0.11:0.00} | eth0: UP | {DateTime.UtcNow:HH:mm:ss}Z", 6);
         for (var i = 0; i < rects.Count; i++) modules[i].Render(canvas, rects[i], elapsed);
-        canvas.Write(1, height - 1, "^C EXIT  |  SYNTHETIC DATA  |  NO LIVE NETWORK ACTIVITY", 4);
+        canvas.Write(1, height - 1, "^C EXIT  |  SYNTHETIC DATA  |  NO LIVE NETWORK ACTIVITY", 3);
         renderer.Write(canvas);
     }
 
@@ -190,8 +191,9 @@ internal static class Program
             var rects = LayoutSolver.Solve(width, height, options.Panels);
             for (var tick = 0; tick < 18; tick++) foreach (var module in modules) module.Update(TimeSpan.FromMilliseconds(500), random);
             for (var index = 0; index < Math.Min(rects.Count, modules.Length); index++) modules[index].Render(canvas, rects[index], TimeSpan.FromSeconds(9));
-            canvas.Write(0, 0, $"Ubuntu 24.04 LTS | Hollywood demo | host: ubuntu-lab | kernel: 6.8.0-52-generic | up 0d 00:00:09 | sessions: 3 | load: 0.72 0.76 0.83 | eth0: up | 14:37:20 UTC", 0);
-            canvas.Write(1, height - 1, "^C EXIT  |  SYNTHETIC DATA  |  NO LIVE NETWORK ACTIVITY", 4);
+            canvas.Write(0, 0, "UBUNTU 24.04 // HOLLYWOOD SIM |", 1);
+            canvas.Write(32, 0, "node: ubuntu-lab | kernel: 6.8.0-52 | up 0d 00:00:09 | sessions: 3 | load: 0.72 0.76 0.83 | eth0: UP | 14:37:20Z", 6);
+            canvas.Write(1, height - 1, "^C EXIT  |  SYNTHETIC DATA  |  NO LIVE NETWORK ACTIVITY", 3);
             Console.WriteLine(canvas.ToPlainText());
         }
         finally { foreach (var module in modules) module.Dispose(); }
