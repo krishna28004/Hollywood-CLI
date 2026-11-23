@@ -49,6 +49,7 @@ Updated: 2026-11-23
 - Extended collision detection to include extensionless commands, so a Git Bash script named `hollywood` is protected just like `.exe`, `.cmd`, `.bat`, and `.com` commands.
 - Fixed upgrade detection to retain the installation's selected command, recover `hollywood` after an earlier unnecessary fallback when the existing install owns that launcher, and remove only stale launchers matching Hollywood's generated content.
 - Updated the installation harness to test the installed directory first in child-shell PATH (so an older copy cannot mask a broken launcher), verify the Bash launcher contents, and exercise Git Bash from `/c/Windows` when Git Bash is installed.
+- Updated the lifecycle harness to temporarily isolate any existing Hollywood install from test PATH resolution and restore the original PATH, uninstall registration, and installer-state registry keys exactly after the disposable runs.
 - Refined the default SOC palette with distinct lime, cyan, amber, magenta, red, neutral-frame, and highlight colors; applied stronger syntax colors to the code feed, lighter panel frames, brighter headings, and a compact simulation status bar.
 - Updated Windows setup documentation for Git Bash and arbitrary working directories.
 
@@ -59,6 +60,7 @@ Updated: 2026-11-23
 - `--snapshot --no-config`: rendered the seven-panel 120x30 operations layout with the shortened header and no clipping outside panel bounds.
 - Self-contained `win-x64` and `win-arm64` application payloads and the Inno Setup 6.7.3 installer compiled successfully. The installer is unsigned; the current local setup SHA-256 is `ec593cf8f3f52ce0e5abae46f8f0fdc108c4a267037f14c7d977754a550b41e0`.
 - Full non-elevated installer lifecycle passed for both a path containing spaces and `Ω` and an extensionless command-collision case: fresh install, actual CMD/Windows PowerShell/Git Bash command lookup from another directory, repeated install, repair, upgrade, invalid-upgrade rollback, collision fallback, and uninstall. Test installs were removed and the original HKCU PATH was restored.
+- A final full-suite run confirmed the live Downloads installation's uninstall registry values, installer state, and HKCU PATH were unchanged byte-for-byte at the value level before versus after the disposable lifecycle tests.
 - Updated the existing per-user installation under `%USERPROFILE%\Downloads\Hollywood`. Its registered command is `hollywood`, both `.cmd` and Bash launchers exist, the stale `hollywood-cli` fallback files were removed, and the installed executable reports `Hollywood CLI 0.2.0`.
 - From Git Bash, launched `hollywood --version` after changing directory to `/c/Windows`; output was `Hollywood CLI 0.2.0`.
 

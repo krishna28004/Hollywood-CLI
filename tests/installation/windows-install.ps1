@@ -14,10 +14,27 @@ $ErrorActionPreference = 'Stop'
 $setup = (Resolve-Path -LiteralPath $SetupPath).Path
 $uninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{C6B24AA2-1A28-4F6C-9C4E-4C2DB93D18D5}_is1'
 $stateKey = 'HKCU:\Software\Hollywood CLI\Installer'
+$uninstallRegKey = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\{C6B24AA2-1A28-4F6C-9C4E-4C2DB93D18D5}_is1'
+$stateRegKey = 'HKCU\Software\Hollywood CLI\Installer'
+$registryBackupDir = Join-Path $env:TEMP ('Hollywood-registry-backup-' + [Guid]::NewGuid().ToString('N'))
+$uninstallBackup = Join-Path $registryBackupDir 'uninstall.reg'
+$stateBackup = Join-Path $registryBackupDir 'installer-state.reg'
+$uninstallBackupExists = Test-Path -LiteralPath $uninstallKey
+$stateBackupExists = Test-Path -LiteralPath $stateKey
+New-Item -ItemType Directory -Force -Path $registryBackupDir | Out-Null
+if ($uninstallBackupExists) {
+    & reg.exe export $uninstallRegKey $uninstallBackup /y | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Could not preserve the pre-test Hollywood uninstall registration.' }
+}
+if ($stateBackupExists) {
+    & reg.exe export $stateRegKey $stateBackup /y | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Could not preserve the pre-test Hollywood installer state.' }
+}
 $environmentKey = 'HKCU:\Environment'
 $originalPathProperty = Get-ItemProperty -LiteralPath $environmentKey -Name Path -ErrorAction SilentlyContinue
 $originalPathExists = $null -ne $originalPathProperty
 $originalPath = if ($originalPathExists) { [string]$originalPathProperty.Path } else { '' }
+$testBaselinePath = $originalPath
 $principal = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())
 $isElevated = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 $configPath = Join-Path $env:LOCALAPPDATA 'Hollywood/config.json'
@@ -33,6 +50,18 @@ function Assert([bool] $Condition, [string] $Message) {
 function Normalize-Entry([string] $Value) {
     $item = [Environment]::ExpandEnvironmentVariables($Value.Trim().Trim('"'))
     return $item.TrimEnd('\').ToLowerInvariant()
+}
+
+$originalProcessPath = $env:PATH
+$registeredInstall = (Get-ItemProperty -LiteralPath $uninstallKey -ErrorAction SilentlyContinue).'Inno Setup: App Path'
+if ($registeredInstall) {
+    $normalizedInstall = Normalize-Entry ([string]$registeredInstall)
+    $env:PATH = (@($env:PATH -split ';') | Where-Object { $_ -and (Normalize-Entry $_) -ne $normalizedInstall }) -join ';'
+    if ($originalPathExists) {
+        $isolatedUserPath = (@($originalPath -split ';') | Where-Object { $_ -and (Normalize-Entry $_) -ne $normalizedInstall }) -join ';'
+        $testBaselinePath = $isolatedUserPath
+        Set-ItemProperty -LiteralPath $environmentKey -Name Path -Value $isolatedUserPath
+    }
 }
 
 function Get-EffectivePath {
@@ -181,7 +210,7 @@ function Run-InstallLifecycle([string] $TargetDir, [string] $ProcessPath, [strin
         $pathProperty = Get-ItemProperty -LiteralPath $environmentKey -Name Path -ErrorAction SilentlyContinue
         $pathAfterUninstall = if ($pathProperty) { [string]$pathProperty.Path } else { '' }
         Assert ((Get-PathCount $pathAfterUninstall $target) -eq 0) 'Uninstall left its PATH entry behind.'
-        Assert ($pathAfterUninstall -ceq $originalPath) 'Uninstall did not restore the exact pre-install user PATH value.'
+        Assert ($pathAfterUninstall -ceq $testBaselinePath) 'Uninstall did not restore the exact test-baseline user PATH value.'
         Assert (Test-Path -LiteralPath $unrelatedSentinel) 'Uninstall removed an unrelated neighboring file.'
         if ($configBefore) {
             Assert ((Get-FileHash -LiteralPath $configPath -Algorithm SHA256).Hash -eq $configBefore) 'Uninstall changed the existing Hollywood configuration.'
@@ -243,11 +272,24 @@ try {
         Assert ((Get-Content -LiteralPath $collisionCommand -Raw) -like '*existing-owner*') 'Collision handling changed the pre-existing hollywood command.'
     }
 } finally {
+    foreach ($registryKey in @($uninstallKey, $stateKey)) {
+        if (Test-Path -LiteralPath $registryKey) { Remove-Item -LiteralPath $registryKey -Recurse -Force }
+    }
+    if ($uninstallBackupExists) {
+        & reg.exe import $uninstallBackup | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'Could not restore the pre-test Hollywood uninstall registration.' }
+    }
+    if ($stateBackupExists) {
+        & reg.exe import $stateBackup | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'Could not restore the pre-test Hollywood installer state.' }
+    }
+    if (Test-Path -LiteralPath $registryBackupDir) { Remove-Item -LiteralPath $registryBackupDir -Recurse -Force }
     if ($originalPathExists) {
         if (-not (Test-Path -LiteralPath $environmentKey)) { New-Item -Path $environmentKey -Force | Out-Null }
         Set-ItemProperty -LiteralPath $environmentKey -Name Path -Value $originalPath
     } else {
         Remove-ItemProperty -LiteralPath $environmentKey -Name Path -ErrorAction SilentlyContinue
     }
+    $env:PATH = $originalProcessPath
     if (Test-Path -LiteralPath $unrelatedSentinel) { Remove-Item -LiteralPath $unrelatedSentinel -Force }
 }
