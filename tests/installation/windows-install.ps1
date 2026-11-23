@@ -81,7 +81,8 @@ function Get-InstalledCommandName {
 }
 
 function Assert-CommandWorks([string] $CommandName, [string] $TargetDir, [string] $ExpectedVersion = '0.2.0') {
-    $pathValue = Get-EffectivePath
+    # Put the install under test first so an older installed copy cannot mask a broken launcher.
+    $pathValue = $TargetDir + ';' + (Get-EffectivePath)
     $expected = "Hollywood CLI $ExpectedVersion"
     $cmd = Invoke-CapturedProcess $env:ComSpec "/d /c $CommandName --version" $env:WINDIR $pathValue
     Assert ($cmd.ExitCode -eq 0 -and $cmd.Output.Contains($expected)) "CMD could not launch $CommandName from $env:WINDIR. $($cmd.Error)"
@@ -93,6 +94,12 @@ function Assert-CommandWorks([string] $CommandName, [string] $TargetDir, [string
         $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
         $result = Invoke-CapturedProcess $exe.Source "-NoLogo -NoProfile -NonInteractive -EncodedCommand $encoded" $env:WINDIR $pathValue
         Assert ($result.ExitCode -eq 0 -and $result.Output.Contains($expected)) "PowerShell $($shell[1]) could not launch $CommandName. $($result.Error)"
+    }
+
+    $gitBash = Join-Path $env:ProgramFiles 'Git/bin/bash.exe'
+    if (Test-Path -LiteralPath $gitBash) {
+        $bash = Invoke-CapturedProcess $gitBash "-c `"cd /c/Windows && $CommandName --version`"" $env:WINDIR $pathValue
+        Assert ($bash.ExitCode -eq 0 -and $bash.Output.Contains($expected)) "Git Bash could not launch $CommandName from /c/Windows. $($bash.Error)"
     }
 }
 
@@ -118,6 +125,11 @@ function Run-InstallLifecycle([string] $TargetDir, [string] $ProcessPath, [strin
         $command = Get-InstalledCommandName
         Assert ($command -in @('hollywood', 'hollywood-cli')) "Unexpected command name '$command'."
         if ($ExpectedCommand) { Assert ($command -eq $ExpectedCommand) "Expected '$ExpectedCommand' after collision detection, got '$command'." }
+        $bashLauncher = Join-Path $target $command
+        Assert (Test-Path -LiteralPath $bashLauncher -PathType Leaf) 'Git Bash command launcher was not installed.'
+        $bashLauncherContent = [IO.File]::ReadAllText($bashLauncher)
+        Assert ($bashLauncherContent.StartsWith('#!/usr/bin/env bash')) 'Git Bash launcher is missing its Bash shebang.'
+        Assert ($bashLauncherContent.Contains('exec winpty "$APP" "$@"')) 'Git Bash launcher does not use winpty for mintty sessions.'
         Assert-CommandWorks $command $target
 
         if (-not $SkipRepeatAndRepairChecks) {
@@ -224,8 +236,8 @@ try {
     if (-not $SkipCollision) {
         $collisionDir = Join-Path $testBase 'Existing Command Owner'
         New-Item -ItemType Directory -Force -Path $collisionDir | Out-Null
-        $collisionCommand = Join-Path $collisionDir 'hollywood.cmd'
-        [IO.File]::WriteAllText($collisionCommand, '@echo off`r`necho existing-owner`r`n', [Text.Encoding]::ASCII)
+        $collisionCommand = Join-Path $collisionDir 'hollywood'
+        [IO.File]::WriteAllText($collisionCommand, "#!/usr/bin/env bash`necho existing-owner`n", [Text.Encoding]::ASCII)
         $collisionTarget = Join-Path $testBase 'Collision Install'
         Run-InstallLifecycle $collisionTarget "$collisionDir;$env:PATH" $UpgradeSetupPath $FailingSetupPath 'hollywood-cli' $SkipRepeatAndRepair
         Assert ((Get-Content -LiteralPath $collisionCommand -Raw) -like '*existing-owner*') 'Collision handling changed the pre-existing hollywood command.'

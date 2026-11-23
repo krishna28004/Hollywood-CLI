@@ -108,7 +108,7 @@ begin
   if IsExistingInstallPath(Entry) then
     Exit;
   BaseName := AddBackslash(Entry) + Command;
-  Result := FileExists(BaseName + '.exe') or FileExists(BaseName + '.cmd') or
+  Result := FileExists(BaseName) or FileExists(BaseName + '.exe') or FileExists(BaseName + '.cmd') or
     FileExists(BaseName + '.bat') or FileExists(BaseName + '.com');
 end;
 
@@ -180,6 +180,7 @@ function InitializeSetup: Boolean;
 var
   HollywoodOwner: String;
   CliOwner: String;
+  StoredCommand: String;
 begin
   Result := False;
   InstallFailed := False;
@@ -192,6 +193,28 @@ begin
   else begin
     MsgBox('Hollywood CLI requires 64-bit Windows (x64 or ARM64).', mbError, MB_OK);
     Exit;
+  end;
+
+  if (ExistingInstallDir <> '') and RegQueryStringValue(HKCU, AppInstallStateKey,
+    CommandValueName, StoredCommand) then begin
+    HollywoodOwner := FindCommandOwner('hollywood');
+    if (StoredCommand = 'hollywood') and (HollywoodOwner = '') then begin
+      SelectedCommand := 'hollywood';
+      Result := True;
+      Exit;
+    end;
+    if (StoredCommand = 'hollywood-cli') and (HollywoodOwner = '') and
+      FileExists(AddBackslash(ExistingInstallDir) + 'hollywood.cmd') then begin
+      { Recover the primary name if a previous update fell back unnecessarily. }
+      SelectedCommand := 'hollywood';
+      Result := True;
+      Exit;
+    end;
+    if (StoredCommand = 'hollywood-cli') and (FindCommandOwner('hollywood-cli') = '') then begin
+      SelectedCommand := 'hollywood-cli';
+      Result := True;
+      Exit;
+    end;
   end;
 
   HollywoodOwner := FindCommandOwner('hollywood');
@@ -232,7 +255,7 @@ var
   BaseName: String;
 begin
   BaseName := AddBackslash(Dir) + Command;
-  Result := FileExists(BaseName + '.exe') or FileExists(BaseName + '.cmd') or
+  Result := FileExists(BaseName) or FileExists(BaseName + '.exe') or FileExists(BaseName + '.cmd') or
     FileExists(BaseName + '.bat') or FileExists(BaseName + '.com');
 end;
 
@@ -302,6 +325,11 @@ begin
   Result := AddBackslash(Dir) + SelectedCommand + '.cmd';
 end;
 
+function BashLauncherFileName(Dir: String): String;
+begin
+  Result := AddBackslash(Dir) + SelectedCommand;
+end;
+
 function BuildLauncherContent(Dir: String): AnsiString;
 var
   Executable: String;
@@ -309,6 +337,19 @@ begin
   Executable := '"%~dp0versions\{#AppVersion}\' + SelectedRuntime + '\hollywood.exe"';
   Result := '@echo off' + #13#10 + 'setlocal' + #13#10 + Executable + ' %*' + #13#10 +
     'exit /b %errorlevel%' + #13#10;
+end;
+
+function BuildBashLauncherContent(Dir: String): AnsiString;
+begin
+  Result := '#!/usr/bin/env bash' + #10 +
+    'set -e' + #10 +
+    'SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"' + #10 +
+    'APP="$SCRIPT_DIR/versions/{#AppVersion}/' + SelectedRuntime + '/hollywood.exe"' + #10 +
+    'if [[ ! -f "$APP" ]]; then echo "Hollywood executable not found: $APP" >&2; exit 127; fi' + #10 +
+    'if [[ -t 0 && -t 1 && -z "${WT_SESSION:-}" ]] && command -v winpty >/dev/null 2>&1; then' + #10 +
+    '  exec winpty "$APP" "$@"' + #10 +
+    'fi' + #10 +
+    'exec "$APP" "$@"' + #10;
 end;
 
 function AppExePath(Dir: String): String;
@@ -365,16 +406,39 @@ begin
   NotifyEnvironmentChanged;
 end;
 
+procedure RemoveStaleLauncher(Dir, Command: String);
+var
+  CurrentCommand: String;
+  FileName: String;
+  ActualContent: AnsiString;
+begin
+  CurrentCommand := SelectedCommand;
+  SelectedCommand := Command;
+  FileName := LauncherFileName(Dir);
+  if FileExists(FileName) and LoadStringFromFile(FileName, ActualContent) and
+    (ActualContent = BuildLauncherContent(Dir)) then
+    DeleteFile(FileName);
+  FileName := BashLauncherFileName(Dir);
+  if FileExists(FileName) and LoadStringFromFile(FileName, ActualContent) and
+    (ActualContent = BuildBashLauncherContent(Dir)) then
+    DeleteFile(FileName);
+  SelectedCommand := CurrentCommand;
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   AppDir: String;
   LauncherName: String;
+  BashLauncherName: String;
   LauncherText: AnsiString;
+  BashLauncherText: AnsiString;
   PathAdded: Boolean;
   PathExists: Boolean;
   PreviousPath: String;
   PreviousLauncher: AnsiString;
   PreviousLauncherExists: Boolean;
+  PreviousBashLauncher: AnsiString;
+  PreviousBashLauncherExists: Boolean;
 begin
   if CurStep <> ssPostInstall then
     Exit;
@@ -387,14 +451,29 @@ begin
   end;
 
   LauncherName := LauncherFileName(AppDir);
+  BashLauncherName := BashLauncherFileName(AppDir);
   PreviousLauncherExists := FileExists(LauncherName);
   PreviousLauncher := '';
   if PreviousLauncherExists then
     LoadStringFromFile(LauncherName, PreviousLauncher);
+  PreviousBashLauncherExists := FileExists(BashLauncherName);
+  PreviousBashLauncher := '';
+  if PreviousBashLauncherExists then
+    LoadStringFromFile(BashLauncherName, PreviousBashLauncher);
   LauncherText := BuildLauncherContent(AppDir);
+  BashLauncherText := BuildBashLauncherContent(AppDir);
 
   if not AtomicWriteLauncher(LauncherName, LauncherText) then begin
     SetInstallFailure('Hollywood could not create its command launcher. No PATH change was made.');
+    Exit;
+  end;
+
+  if not AtomicWriteLauncher(BashLauncherName, BashLauncherText) then begin
+    if PreviousLauncherExists then
+      AtomicWriteLauncher(LauncherName, PreviousLauncher)
+    else
+      DeleteFile(LauncherName);
+    SetInstallFailure('Hollywood could not create its Git Bash launcher. The previous command launcher was restored.');
     Exit;
   end;
 
@@ -403,6 +482,10 @@ begin
       AtomicWriteLauncher(LauncherName, PreviousLauncher)
     else
       DeleteFile(LauncherName);
+    if PreviousBashLauncherExists then
+      AtomicWriteLauncher(BashLauncherName, PreviousBashLauncher)
+    else
+      DeleteFile(BashLauncherName);
     SetInstallFailure('Hollywood could not update your user PATH. The previous command launcher was restored.');
     Exit;
   end;
@@ -415,6 +498,10 @@ begin
       AtomicWriteLauncher(LauncherName, PreviousLauncher)
     else
       DeleteFile(LauncherName);
+    if PreviousBashLauncherExists then
+      AtomicWriteLauncher(BashLauncherName, PreviousBashLauncher)
+    else
+      DeleteFile(BashLauncherName);
     SetInstallFailure('Hollywood could not record its installed command. Your previous PATH and launcher were restored.');
     Exit;
   end;
@@ -426,6 +513,10 @@ begin
         AtomicWriteLauncher(LauncherName, PreviousLauncher)
       else
         DeleteFile(LauncherName);
+      if PreviousBashLauncherExists then
+        AtomicWriteLauncher(BashLauncherName, PreviousBashLauncher)
+      else
+        DeleteFile(BashLauncherName);
       RegDeleteValue(HKCU, AppInstallStateKey, PathOwnedValueName);
       RegDeleteValue(HKCU, AppInstallStateKey, CommandValueName);
       RegDeleteValue(HKCU, AppInstallStateKey, RuntimeValueName);
@@ -433,6 +524,11 @@ begin
       Exit;
     end;
   end;
+
+  if SelectedCommand = 'hollywood' then
+    RemoveStaleLauncher(AppDir, 'hollywood-cli')
+  else
+    RemoveStaleLauncher(AppDir, 'hollywood');
 
   NotifyEnvironmentChanged;
 end;
@@ -476,6 +572,10 @@ begin
     LauncherName := LauncherFileName(AppDir);
     if FileExists(LauncherName) and LoadStringFromFile(LauncherName, ActualLauncher) and
       (ActualLauncher = BuildLauncherContent(AppDir)) then
+      DeleteFile(LauncherName);
+    LauncherName := BashLauncherFileName(AppDir);
+    if FileExists(LauncherName) and LoadStringFromFile(LauncherName, ActualLauncher) and
+      (ActualLauncher = BuildBashLauncherContent(AppDir)) then
       DeleteFile(LauncherName);
   end;
 

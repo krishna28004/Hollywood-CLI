@@ -8,13 +8,15 @@
 
 Outputs are written under the ignored `artifacts/installer/` directory. Setup is per-user (`%LOCALAPPDATA%\Programs\Hollywood`), tracks only its own PATH registration, and has no service or startup entry. It detects an existing `hollywood` command and selects `hollywood-cli` if available; if both names conflict it aborts without replacing the existing command. Configuration lives outside the install directory and is preserved on uninstall.
 
+The setup installs launchers for PowerShell/CMD and Git Bash in the same PATH directory. Open a new terminal after setup, then run `hollywood` from any working directory. In Git Bash's mintty terminal, the launcher uses `winpty` when available; in Windows Terminal it starts the native console app directly. Existing shells can retain an older PATH until they are restarted.
+
 Validate a built installer with:
 
 ```powershell
 ./tests/installation/windows-install.ps1 -SetupPath ./artifacts/installer/releases/windows/Hollywood-Setup.exe
 ```
 
-The test uses temporary installs and restores the pre-test HKCU PATH value. It skips an existing default install directory. To test version upgrade and failed-upgrade recovery, first build the test-only fixtures:
+The test uses temporary installs and restores the pre-test HKCU PATH value. It checks command launch from arbitrary working directories in CMD and installed PowerShell versions, and exercises Git Bash when its standard installation is present. It skips an existing default install directory. To test version upgrade and failed-upgrade recovery, first build the test-only fixtures:
 
 ```powershell
 ./tests/installation/build-fixtures.ps1

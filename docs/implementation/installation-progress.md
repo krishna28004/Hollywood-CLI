@@ -40,3 +40,37 @@ Updated: 2026-11-23
 3. Validate setup and command lookup on Windows ARM64 hardware or a qualified VM.
 4. Keep installer unsigned and local until signing credentials, publisher identity, and project license are authorized.
 5. Prepare Linux `.deb`/`.rpm` and macOS `.pkg` only after target distribution and signing qualification plans are available.
+
+## Follow-up: Git Bash launcher and visual polish (2026-11-23)
+
+### Completed
+
+- Added an extensionless Bash launcher beside the Windows `.cmd` launcher. It resolves the versioned executable relative to its install directory, forwards arguments safely, uses `winpty` for interactive mintty sessions when available, and runs directly in Windows Terminal.
+- Extended collision detection to include extensionless commands, so a Git Bash script named `hollywood` is protected just like `.exe`, `.cmd`, `.bat`, and `.com` commands.
+- Fixed upgrade detection to retain the installation's selected command, recover `hollywood` after an earlier unnecessary fallback when the existing install owns that launcher, and remove only stale launchers matching Hollywood's generated content.
+- Updated the installation harness to test the installed directory first in child-shell PATH (so an older copy cannot mask a broken launcher), verify the Bash launcher contents, and exercise Git Bash from `/c/Windows` when Git Bash is installed.
+- Refined the default SOC palette with distinct lime, cyan, amber, magenta, red, neutral-frame, and highlight colors; applied stronger syntax colors to the code feed, lighter panel frames, brighter headings, and a compact simulation status bar.
+- Updated Windows setup documentation for Git Bash and arbitrary working directories.
+
+### Verification evidence
+
+- `dotnet build Hollywood.sln -c Release -m:1 --no-restore`: passed, 0 warnings and 0 errors.
+- `Hollywood.UnitTests.dll`: passed, including layout coverage, all ten modules, VT diffing, deterministic data, and the updated theme palette checks.
+- `--snapshot --no-config`: rendered the seven-panel 120x30 operations layout with the shortened header and no clipping outside panel bounds.
+- Self-contained `win-x64` and `win-arm64` application payloads and the Inno Setup 6.7.3 installer compiled successfully. The installer is unsigned; the current local setup SHA-256 is `ec593cf8f3f52ce0e5abae46f8f0fdc108c4a267037f14c7d977754a550b41e0`.
+- Full non-elevated installer lifecycle passed for both a path containing spaces and `Ω` and an extensionless command-collision case: fresh install, actual CMD/Windows PowerShell/Git Bash command lookup from another directory, repeated install, repair, upgrade, invalid-upgrade rollback, collision fallback, and uninstall. Test installs were removed and the original HKCU PATH was restored.
+- Updated the existing per-user installation under `%USERPROFILE%\Downloads\Hollywood`. Its registered command is `hollywood`, both `.cmd` and Bash launchers exist, the stale `hollywood-cli` fallback files were removed, and the installed executable reports `Hollywood CLI 0.2.0`.
+- From Git Bash, launched `hollywood --version` after changing directory to `/c/Windows`; output was `Hollywood CLI 0.2.0`.
+
+### Still unverified
+
+- Interactive mintty rendering through `winpty`, interactive Windows Terminal rendering, reboot/sign-out persistence, Windows ARM64 runtime behavior, and signed distribution remain unverified. The automated installer test verifies Git Bash command resolution in a noninteractive `--version` invocation; it does not prove the full interactive screen path.
+- No actual screenshot-based live terminal visual regression was captured in this environment. The deterministic snapshot and unit palette assertions passed.
+
+### Next tasks
+
+1. Run Hollywood interactively in Git Bash mintty and Windows Terminal, then capture and compare representative screenshots.
+2. Verify the registered command after a real sign-out/reboot in a disposable Windows environment.
+3. Validate the ARM64 installer on Windows ARM64 hardware or a qualified VM.
+4. Add an approved project `LICENSE` and configure signing before any public distribution.
+5. Continue Linux/macOS packaging qualification and CI runtime tests.
