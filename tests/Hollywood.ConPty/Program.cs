@@ -22,12 +22,13 @@ try
     using var session = new PseudoConsoleSession(executable, new PseudoConsoleSession.Coord(80, 24));
     await session.StartAsync();
     var sceneDeadline = Stopwatch.StartNew();
-    while (!session.CapturedText.Contains("Ubuntu 24.04", StringComparison.Ordinal) && sceneDeadline.Elapsed < TimeSpan.FromSeconds(5))
+    while (!session.CapturedText.Contains("HOLLYWOOD SIM", StringComparison.Ordinal) && sceneDeadline.Elapsed < TimeSpan.FromSeconds(5))
     {
         if (session.HasExited) throw new InvalidOperationException($"Application exited before drawing a scene (exit {session.ExitCode}): {session.CapturedText}");
         await Task.Delay(50);
     }
-    if (!session.CapturedText.Contains("Hollywood demo", StringComparison.Ordinal)) throw new TimeoutException("No Hollywood frame appeared within five seconds.");
+    if (!session.CapturedText.Contains("HOLLYWOOD SIM", StringComparison.Ordinal))
+        throw new TimeoutException($"No Hollywood frame appeared within five seconds (exited={session.HasExited}, code={session.ExitCode}). Captured tail: {session.CapturedText[^Math.Min(1200, session.CapturedText.Length)..]}");
 
     var firstFrameBytes = session.CapturedByteCount;
     await Task.Delay(700);
@@ -49,7 +50,11 @@ try
     if (!session.CapturedText.Contains("RESIZE", StringComparison.Ordinal))
         throw new InvalidOperationException($"Tiny viewport did not receive its compact fallback prompt. Captured tail: {session.CapturedText[^Math.Min(1200, session.CapturedText.Length)..]}");
     session.Resize(new PseudoConsoleSession.Coord(120, 30));
-    await Task.Delay(250);
+    var radarDeadline = Stopwatch.StartNew();
+    while (!session.CapturedText.Contains("RADAR / THREAT SCOPE", StringComparison.Ordinal) && radarDeadline.Elapsed < TimeSpan.FromSeconds(3))
+        await Task.Delay(50);
+    if (!session.CapturedText.Contains("RADAR / THREAT SCOPE", StringComparison.Ordinal))
+        throw new TimeoutException("The radar panel did not appear after resizing to 120x30.");
     await session.SendKeyAsync(0x03);
     if (!await session.WaitForExitAsync(TimeSpan.FromSeconds(5))) throw new TimeoutException("Application did not exit after Ctrl+C within five seconds.");
     if (session.ExitCode != 130) throw new InvalidOperationException($"Ctrl+C exit returned code {session.ExitCode}, expected 130.");
@@ -59,12 +64,13 @@ try
     using var escapeSession = new PseudoConsoleSession(executable, new PseudoConsoleSession.Coord(80, 24));
     await escapeSession.StartAsync();
     var escapeDeadline = Stopwatch.StartNew();
-    while (!escapeSession.CapturedText.Contains("Ubuntu 24.04", StringComparison.Ordinal) && escapeDeadline.Elapsed < TimeSpan.FromSeconds(5))
+    while (!escapeSession.CapturedText.Contains("HOLLYWOOD SIM", StringComparison.Ordinal) && escapeDeadline.Elapsed < TimeSpan.FromSeconds(5))
     {
         if (escapeSession.HasExited) throw new InvalidOperationException($"Second launch exited before drawing (exit {escapeSession.ExitCode}).");
         await Task.Delay(50);
     }
-    if (!escapeSession.CapturedText.Contains("Hollywood demo", StringComparison.Ordinal)) throw new TimeoutException("Second launch did not draw a scene within five seconds.");
+    if (!escapeSession.CapturedText.Contains("HOLLYWOOD SIM", StringComparison.Ordinal))
+        throw new TimeoutException($"Second launch did not draw a scene within five seconds (exited={escapeSession.HasExited}, code={escapeSession.ExitCode}). Captured tail: {escapeSession.CapturedText[^Math.Min(1200, escapeSession.CapturedText.Length)..]}");
     await escapeSession.SendKeyAsync(0x1b);
     await Task.Delay(350);
     if (escapeSession.HasExited) throw new InvalidOperationException("Escape should be ignored; Ctrl+C is the only keyboard exit.");
@@ -74,12 +80,12 @@ try
     using var cancelSession = new PseudoConsoleSession(executable, new PseudoConsoleSession.Coord(80, 24));
     await cancelSession.StartAsync();
     var cancelDeadline = Stopwatch.StartNew();
-    while (!cancelSession.CapturedText.Contains("Ubuntu 24.04", StringComparison.Ordinal) && cancelDeadline.Elapsed < TimeSpan.FromSeconds(5))
+    while (!cancelSession.CapturedText.Contains("HOLLYWOOD SIM", StringComparison.Ordinal) && cancelDeadline.Elapsed < TimeSpan.FromSeconds(5))
     {
         if (cancelSession.HasExited) throw new InvalidOperationException($"Third launch exited before drawing (exit {cancelSession.ExitCode}).");
         await Task.Delay(50);
     }
-    if (!cancelSession.CapturedText.Contains("Hollywood demo", StringComparison.Ordinal)) throw new TimeoutException("Third launch did not draw a scene within five seconds.");
+    if (!cancelSession.CapturedText.Contains("HOLLYWOOD SIM", StringComparison.Ordinal)) throw new TimeoutException("Third launch did not draw a scene within five seconds.");
     await cancelSession.SendKeyAsync(0x03);
     if (!await cancelSession.WaitForExitAsync(TimeSpan.FromSeconds(5)) || cancelSession.ExitCode != 130) throw new InvalidOperationException($"ConPTY Ctrl+C input did not return expected code 130 (got {cancelSession.ExitCode}).");
 

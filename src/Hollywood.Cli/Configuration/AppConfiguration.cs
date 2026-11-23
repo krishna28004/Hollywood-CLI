@@ -17,7 +17,7 @@ public sealed record AppConfiguration
     public bool ReducedMotion { get; init; }
     public string TelemetryMode { get; init; } = "simulated";
     public string[] EnabledModules { get; init; } = [
-        "code", "system", "wave", "network", "security", "data", "topology", "build", "dashboard", "rain"
+        "code", "system", "wave", "network", "security", "data", "radar", "topology", "build", "dashboard", "rain"
     ];
 
     public static string DefaultPath
@@ -72,8 +72,8 @@ public sealed record AppConfiguration
         if (ColorMode is not ("auto" or "truecolor" or "16color" or "mono")) throw new InvalidDataException("colorMode must be auto, truecolor, 16color, or mono.");
         if (GlyphMode != "ascii") throw new InvalidDataException("Only ASCII glyph mode is currently supported.");
         if (TelemetryMode != "simulated") throw new InvalidDataException("Only simulated telemetry is currently supported.");
-        if (EnabledModules.Length is < 1 or > 10) throw new InvalidDataException("enabledModules must contain between 1 and 10 module names.");
-        var allowed = new HashSet<string>(["code", "network", "rain", "data", "security", "system", "build", "wave", "topology", "dashboard"], StringComparer.Ordinal);
+        if (EnabledModules.Length is < 1 or > 11) throw new InvalidDataException("enabledModules must contain between 1 and 11 module names.");
+        var allowed = new HashSet<string>(["code", "network", "rain", "data", "security", "system", "build", "wave", "radar", "topology", "dashboard"], StringComparer.Ordinal);
         if (EnabledModules.Any(name => !allowed.Contains(name)) || EnabledModules.Distinct(StringComparer.Ordinal).Count() != EnabledModules.Length)
             throw new InvalidDataException("enabledModules contains an unknown or duplicate module name.");
     }

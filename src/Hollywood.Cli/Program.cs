@@ -291,7 +291,8 @@ internal static class Program
         {
             ("code", new CodeStreamModule()), ("system", new SystemMetricsModule()), ("wave", new AsciiWaveModule()),
             ("network", new NetworkTrafficModule()), ("security", new SecurityFeedModule()), ("data", new DataProcessingModule()),
-            ("topology", new NetworkTopologyModule()), ("build", new BuildLogsModule()), ("dashboard", new DashboardMetricsModule()), ("rain", new DigitalRainModule())
+            ("radar", new RadarModule()), ("topology", new NetworkTopologyModule()),
+            ("build", new BuildLogsModule()), ("dashboard", new DashboardMetricsModule()), ("rain", new DigitalRainModule())
         };
         var selected = all.Where(item => enabled.Contains(item.Id, StringComparer.Ordinal)).Select(item => item.Module).ToArray();
         foreach (var item in all.Where(item => !enabled.Contains(item.Id, StringComparer.Ordinal))) item.Module.Dispose();

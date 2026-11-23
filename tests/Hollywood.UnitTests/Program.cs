@@ -120,9 +120,10 @@ finally { if (File.Exists(configPath)) File.Delete(configPath); }
 
 IVisualModule[] modules =
 [
-    new CodeStreamModule(), new NetworkTrafficModule(), new DigitalRainModule(),
-    new DataProcessingModule(), new SecurityFeedModule(), new SystemMetricsModule(),
-    new BuildLogsModule(), new AsciiWaveModule(), new NetworkTopologyModule(), new DashboardMetricsModule()
+    new CodeStreamModule(), new SystemMetricsModule(), new AsciiWaveModule(),
+    new NetworkTrafficModule(), new SecurityFeedModule(), new DataProcessingModule(),
+    new RadarModule(), new NetworkTopologyModule(), new BuildLogsModule(),
+    new DashboardMetricsModule(), new DigitalRainModule()
 ];
 var flagshipLayout = LayoutSolver.Solve(120, 30, 7);
 var flagship = new Canvas(120, 30);
@@ -135,7 +136,49 @@ var denseLayout = LayoutSolver.Solve(160, 45, 10);
 var dense = new Canvas(160, 45);
 for (var index = 0; index < denseLayout.Count; index++) modules[index].Render(dense, denseLayout[index], TimeSpan.FromSeconds(3));
 var denseText = dense.ToPlainText();
-foreach (var module in modules) Check(denseText.Contains(module.Title, StringComparison.Ordinal), $"Dense view missing title {module.Title}.");
+foreach (var module in modules.Take(10)) Check(denseText.Contains(module.Title, StringComparison.Ordinal), $"Dense view missing title {module.Title}.");
 foreach (var module in modules) module.Dispose();
 
-Console.WriteLine("PASS: clipping, borders, 96,000 layout cases, flagship seven-panel and dense ten-panel layouts, ten modules, VT diffing, bottom-right protection, deterministic PRNG, five-theme configuration validation");
+var radarA = new RadarModule();
+var radarB = new RadarModule();
+var radarASeed = new DeterministicRandom(4321);
+var radarBSeed = new DeterministicRandom(4321);
+var radarBounds = new Rect(5, 2, 40, 12);
+var radarFrameA = new Canvas(50, 16);
+var radarFrameB = new Canvas(50, 16);
+for (var tick = 0; tick < 8; tick++)
+{
+    radarA.Update(TimeSpan.FromMilliseconds(100), radarASeed);
+    radarB.Update(TimeSpan.FromMilliseconds(100), radarBSeed);
+}
+radarA.Render(radarFrameA, radarBounds, TimeSpan.FromSeconds(1));
+radarB.Render(radarFrameB, radarBounds, TimeSpan.FromSeconds(1));
+Check(radarA.Title == "RADAR / THREAT SCOPE", "Radar title is missing.");
+Check(radarFrameA.ToPlainText().Contains("RADAR / THREAT SCOPE", StringComparison.Ordinal), "Radar title did not render.");
+Check(radarFrameA.CopyCells().SequenceEqual(radarFrameB.CopyCells()), "Radar seeded rendering is not deterministic.");
+Check(radarFrameA.CopyCells().Any(static cell => cell.Style == 5), "Radar warning/threat color is missing.");
+for (var y = 0; y < radarFrameA.Height; y++)
+for (var x = 0; x < radarFrameA.Width; x++)
+    if (!radarBounds.Contains(x, y)) Check(radarFrameA[x, y] == Cell.Blank, "Radar drew outside its panel bounds.");
+
+var resizedCanvas = new Canvas(25, 12);
+var resizedBounds = new Rect(2, 2, 20, 8);
+radarA.Render(resizedCanvas, resizedBounds, TimeSpan.FromSeconds(1));
+Check(resizedCanvas.ToPlainText().Contains("RADAR / SCOPE", StringComparison.Ordinal), "Radar did not adapt its title to a narrow panel.");
+for (var y = 0; y < resizedCanvas.Height; y++)
+for (var x = 0; x < resizedCanvas.Width; x++)
+    if (!resizedBounds.Contains(x, y)) Check(resizedCanvas[x, y] == Cell.Blank, "Resized radar exceeded its panel clip.");
+
+radarA.Suspend();
+var pausedFrame = radarFrameA.CopyCells();
+radarA.Update(TimeSpan.FromSeconds(3), radarASeed);
+radarA.Render(radarFrameA, radarBounds, TimeSpan.FromSeconds(4));
+Check(radarFrameA.CopyCells().SequenceEqual(pausedFrame), "Suspended radar animation continued updating.");
+radarA.Resume();
+radarA.Update(TimeSpan.FromSeconds(1), radarASeed);
+radarA.Render(radarFrameA, radarBounds, TimeSpan.FromSeconds(5));
+Check(!radarFrameA.CopyCells().SequenceEqual(pausedFrame), "Resumed radar sweep did not advance.");
+radarA.Dispose();
+radarB.Dispose();
+
+Console.WriteLine("PASS: clipping, borders, 96,000 layout cases, flagship seven-panel and dense ten-panel layouts, eleven visual modules, deterministic animated radar, pause/resume, VT diffing, bottom-right protection, deterministic PRNG, five-theme configuration validation");
