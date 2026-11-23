@@ -5,6 +5,7 @@ namespace Hollywood.Engine.Modules;
 
 public sealed class CodeStreamModule : IVisualModule
 {
+    private static readonly string[] Keywords = ["from", "import", "as", "class", "def", "async", "await", "for", "in", "if", "else", "return", "raise", "while", "use", "struct", "impl", "fn", "let", "mut", "pub", "internal", "using", "var", "new", "void", "int", "string", "param", "function", "foreach", "object", "true", "false", "null", "None"];
     private static readonly (string File, string[] Lines)[] Listings =
     [
         ("src/collector/flow_parser.py", [
@@ -88,22 +89,68 @@ public sealed class CodeStreamModule : IVisualModule
             var current = row == visibleRows - 1;
             canvas.Write(bounds.X + 1, y, current ? ">" : " ", 3, bounds);
             canvas.Write(bounds.X + 2, y, $"{sourceIndex + 1,3} ", 6, bounds);
-            canvas.Write(bounds.X + 7, y, text, StyleFor(text), bounds);
+            RenderCodeLine(canvas, bounds.X + 7, y, text, bounds);
         }
     }
 
-    private static byte StyleFor(string line)
+    // Token coloring is deliberately lightweight: the stream is illustrative, so a
+    // small lexical pass gives it editor-like detail without a parser per language.
+    private static void RenderCodeLine(Canvas canvas, int x, int y, string line, Rect clip)
     {
-        var trimmed = line.TrimStart();
-        if (trimmed.StartsWith("#", StringComparison.Ordinal) || trimmed.StartsWith("//", StringComparison.Ordinal)) return 1;
-        if (trimmed.StartsWith("def ", StringComparison.Ordinal) || trimmed.StartsWith("class ", StringComparison.Ordinal)
-            || trimmed.StartsWith("async ", StringComparison.Ordinal) || trimmed.StartsWith("fn ", StringComparison.Ordinal)
-            || trimmed.StartsWith("function ", StringComparison.Ordinal) || trimmed.StartsWith("internal ", StringComparison.Ordinal)
-            || trimmed.StartsWith("use ", StringComparison.Ordinal) || trimmed.StartsWith("using ", StringComparison.Ordinal)) return 2;
-        if (line.Contains('"') || line.Contains('\'')) return 3;
-        if (trimmed.StartsWith("return ", StringComparison.Ordinal) || trimmed.StartsWith("raise ", StringComparison.Ordinal)
-            || trimmed.StartsWith("if ", StringComparison.Ordinal) || trimmed.StartsWith("while ", StringComparison.Ordinal)) return 4;
-        return 0;
+        var i = 0;
+        var inString = false;
+        var quote = '\0';
+        while (i < line.Length && x + i < clip.Right - 1)
+        {
+            var start = i;
+            var c = line[i];
+            byte style;
+            if (!inString && (c == '#' || (c == '/' && i + 1 < line.Length && line[i + 1] == '/')))
+            {
+                for (; i < line.Length && x + i < clip.Right - 1; i++) canvas.Set(x + i, y, line[i], 1);
+                return;
+            }
+            if (c is '"' or '\'')
+            {
+                quote = c;
+                inString = true;
+                i++;
+                while (i < line.Length)
+                {
+                    if (line[i] == '\\' && i + 1 < line.Length) { i += 2; continue; }
+                    if (line[i++] == quote) { inString = false; break; }
+                }
+                style = 3;
+            }
+            else if (char.IsLetter(c) || c == '_' || c == '$')
+            {
+                i++;
+                while (i < line.Length && (char.IsLetterOrDigit(line[i]) || line[i] is '_' or '$')) i++;
+                style = KeywordStyle(line.AsSpan(start, i - start));
+            }
+            else if (char.IsDigit(c))
+            {
+                i++;
+                while (i < line.Length && (char.IsLetterOrDigit(line[i]) || line[i] is '.' or '_')) i++;
+                style = 4;
+            }
+            else
+            {
+                i++;
+                style = c is '=' or '>' or '<' or '+' or '-' or '|' or '&' ? (byte)5
+                    : c is '(' or ')' or '[' or ']' or '{' or '}' or ':' or ',' or ';' or '.' ? (byte)6
+                    : (byte)0;
+            }
+            for (var column = start; column < i && x + column < clip.Right - 1; column++)
+                canvas.Set(x + column, y, line[column], style);
+        }
+    }
+
+    private static byte KeywordStyle(ReadOnlySpan<char> token)
+    {
+        foreach (var keyword in Keywords)
+            if (token.SequenceEqual(keyword)) return 2;
+        return token[0] is >= 'A' and <= 'Z' ? (byte)7 : (byte)0;
     }
 
     public void Dispose() { }

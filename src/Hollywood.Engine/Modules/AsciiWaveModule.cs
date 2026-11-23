@@ -42,7 +42,8 @@ public sealed class AsciiWaveModule : IVisualModule
     {
         canvas.Border(bounds, 6);
         canvas.Write(bounds.X + 2, bounds.Y, Title, 1, bounds);
-        canvas.Write(bounds.X + 2, bounds.Y + 1, $"RX {rxRate,2}.{rxRate % 10} MiB/s    TX {txRate,2}.{txRate % 10} MiB/s", 3, bounds);
+        canvas.Write(bounds.X + 2, bounds.Y + 1, $"RX {rxRate,2}.{rxRate % 10} MiB/s", 1, bounds);
+        canvas.Write(bounds.X + 25, bounds.Y + 1, $"TX {txRate,2}.{txRate % 10} MiB/s  [SIMULATED CAPTURE]", 2, bounds);
         var graphTop = bounds.Y + 2;
         var graphBottom = bounds.Bottom - 2;
         if (graphBottom <= graphTop) return;
@@ -53,16 +54,28 @@ public sealed class AsciiWaveModule : IVisualModule
         if (graphHeight > 3) canvas.Write(bounds.X + 1, graphTop + graphHeight / 2, "16M", 0, bounds);
         canvas.Write(bounds.X + 2, graphBottom, "0", 0, bounds);
 
+        for (var gridY = graphTop + 2; gridY < graphBottom; gridY += 4)
+            for (var gridX = graphLeft; gridX < bounds.Right - 2; gridX += 2)
+                canvas.Set(gridX, gridY, '.', 6);
+
+        var previousRxY = -1;
+        var previousTxY = -1;
         for (var column = 0; column < graphWidth; column++)
         {
             var sample = column * (receive.Length - 1) / Math.Max(1, graphWidth - 1);
             var rxY = graphBottom - 1 - receive[sample] * Math.Max(1, graphHeight - 1) / 100;
             var txY = graphBottom - 1 - transmit[sample] * Math.Max(1, graphHeight - 1) / 100;
-            canvas.Set(graphLeft + column, rxY, '*', 3);
+            if (previousRxY >= 0 && Math.Abs(rxY - previousRxY) > 1)
+                for (var y = Math.Min(rxY, previousRxY) + 1; y < Math.Max(rxY, previousRxY); y++) canvas.Set(graphLeft + column, y, ':', 1);
+            if (previousTxY >= 0 && Math.Abs(txY - previousTxY) > 1)
+                for (var y = Math.Min(txY, previousTxY) + 1; y < Math.Max(txY, previousTxY); y++) canvas.Set(graphLeft + column, y, ':', 2);
+            canvas.Set(graphLeft + column, rxY, '*', 1);
             canvas.Set(graphLeft + column, txY, '.', 2);
+            previousRxY = rxY;
+            previousTxY = txY;
         }
 
-        canvas.Write(bounds.Right - 14, graphTop, "* RX MiB/s", 3, bounds);
+        canvas.Write(bounds.Right - 14, graphTop, "* RX MiB/s", 1, bounds);
         canvas.Write(bounds.Right - 14, graphTop + 1, ". TX MiB/s", 2, bounds);
     }
 

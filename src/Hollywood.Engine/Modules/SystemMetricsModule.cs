@@ -45,8 +45,8 @@ public sealed class SystemMetricsModule : IVisualModule
         if (bounds.Height < 7) return;
 
         var up = $"{(int)uptime.TotalDays:D1}d {uptime.Hours:D2}:{uptime.Minutes:D2}:{uptime.Seconds:D2}";
-        canvas.Write(bounds.X + 2, bounds.Y + 4, $"Tasks: 214  thr: 620  load: {0.71 + cpu / 100d:0.00} {0.69 + cpu / 100d:0.00} 1.32  up {up}", 0, bounds);
-        canvas.Write(bounds.X + 2, bounds.Y + 5, "PID USER  PRI NI  VIRT   RES   CPU% MEM% COMMAND", 2, bounds);
+        canvas.Write(bounds.X + 2, bounds.Y + 4, $"T 214 thr 620  L {0.71 + cpu / 100d:0.00} {0.69 + cpu / 100d:0.00} 1.32  up {up}", 0, bounds);
+        canvas.Write(bounds.X + 2, bounds.Y + 5, "PID USER PRI NI VIRT RES S CPU% MEM% COMMAND", 2, bounds);
 
         var availableRows = Math.Max(0, bounds.Height - 7);
         for (var row = 0; row < availableRows; row++)
@@ -55,8 +55,17 @@ public sealed class SystemMetricsModule : IVisualModule
             var processCpu = Math.Max(0.1, (cpu * (0.08 + ((processIndex * 13) % 19) / 100d)));
             var processMemory = 0.4 + processIndex * 0.23;
             var pid = 2371 + processIndex * 317;
-            var line = $"{pid,4} ubuntu 20  0  {128 + processIndex * 31,3}M {48 + processIndex * 17,3}M {processCpu,4:0.0} {processMemory,4:0.0} {Processes[processIndex]}";
-            canvas.Write(bounds.X + 2, bounds.Y + 6 + row, line, processIndex == 0 ? (byte)4 : (byte)0, bounds);
+            var lineY = bounds.Y + 6 + row;
+            var x = bounds.X + 2;
+            canvas.Write(x, lineY, $"{pid,4}", 6, bounds);
+            canvas.Write(x + 5, lineY, "ubuntu", 0, bounds);
+            canvas.Write(x + 12, lineY, "20  0", 6, bounds);
+            canvas.Write(x + 19, lineY, $"{128 + processIndex * 31,3}M", 0, bounds);
+            canvas.Write(x + 24, lineY, $"{48 + processIndex * 17,3}M", 0, bounds);
+            canvas.Write(x + 29, lineY, processIndex == 0 ? "R" : "S", processIndex == 0 ? (byte)3 : (byte)6, bounds);
+            canvas.Write(x + 32, lineY, $"{processCpu,4:0.0}", processCpu >= 5 ? (byte)5 : (byte)1, bounds);
+            canvas.Write(x + 37, lineY, $"{processMemory,4:0.0}", 4, bounds);
+            canvas.Write(x + 42, lineY, Processes[processIndex], processIndex == 0 ? (byte)7 : (byte)0, bounds);
         }
     }
 
