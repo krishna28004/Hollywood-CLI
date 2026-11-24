@@ -26,8 +26,10 @@ public sealed class DataProcessingModule : IVisualModule
         Enqueue("}", 0);
     }
 
-    public void Update(TimeSpan elapsed, DeterministicRandom random)
+    public void Update(VisualUpdateContext context)
     {
+        var elapsed = context.ScaleElapsed(0.2, 4.5);
+        var random = context.Random;
         accumulated += elapsed;
         while (accumulated >= TimeSpan.FromMilliseconds(185))
         {

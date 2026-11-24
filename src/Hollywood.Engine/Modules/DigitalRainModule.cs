@@ -9,8 +9,10 @@ public sealed class DigitalRainModule : IVisualModule
     private TimeSpan accumulated;
     public string Title => "DIGITAL RAIN";
 
-    public void Update(TimeSpan elapsed, DeterministicRandom random)
+    public void Update(VisualUpdateContext context)
     {
+        var elapsed = context.ScaleElapsed(0.25, 3.5);
+        var random = context.Random;
         accumulated += elapsed;
         while (accumulated >= TimeSpan.FromMilliseconds(100))
         {

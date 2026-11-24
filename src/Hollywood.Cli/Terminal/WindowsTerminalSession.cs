@@ -141,6 +141,9 @@ internal sealed class WindowsTerminalSession : ITerminalSession
         {
             if (!ReadConsoleInput(inputHandle, out var record, 1, out var read) || read != 1) return false;
             if (record.EventType != KeyEvent || !record.KeyEvent.KeyDown) continue;
+            // Ignore modifier chords; Ctrl+C remains handled by the console's processed-input path.
+            if ((record.KeyEvent.ControlKeyState & 0x000F) != 0) continue;
+            if (record.KeyEvent.VirtualKeyCode is 0x10 or 0x11 or 0x12 or 0x14 or 0x5B or 0x5C) continue;
             key = (ConsoleKey)record.KeyEvent.VirtualKeyCode;
             return true;
         }

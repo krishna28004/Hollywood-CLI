@@ -16,8 +16,10 @@ public sealed class NetworkTrafficModule : IVisualModule
     private int drops = 37;
     public string Title => "PACKET FLOW / RFC5737";
 
-    public void Update(TimeSpan elapsed, DeterministicRandom random)
+    public void Update(VisualUpdateContext context)
     {
+        var elapsed = context.ScaleElapsed(0.25, 4);
+        var random = context.Random;
         accumulated += elapsed;
         while (accumulated >= TimeSpan.FromMilliseconds(125))
         {

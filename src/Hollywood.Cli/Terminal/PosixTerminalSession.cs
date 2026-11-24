@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Diagnostics;
 
 namespace Hollywood.Cli.Terminal;
 
@@ -16,6 +17,10 @@ internal sealed class PosixTerminalSession : ITerminalSession
     private bool terminalModesEntered;
     private IntPtr originalTerminalAttributes;
     private bool disposed;
+    private int escapeState;
+    private long escapeStarted;
+    private int sequenceLength;
+    private int utf8ContinuationBytes;
 
     private PosixTerminalSession() { }
 
@@ -89,18 +94,80 @@ internal sealed class PosixTerminalSession : ITerminalSession
     public bool TryReadKey(out ConsoleKey key)
     {
         key = default;
-        if (ReadByte(0, out var input) != 1) return false;
+        while (ReadByte(0, out var input) == 1)
+        {
+            if (utf8ContinuationBytes > 0)
+            {
+                if ((input & 0xC0) == 0x80) { utf8ContinuationBytes--; continue; }
+                utf8ContinuationBytes = 0;
+            }
+            if (escapeState == 1)
+            {
+                if (input == (byte)'[' || input == (byte)'O') { escapeState = input == (byte)'[' ? 2 : 3; sequenceLength = 0; continue; }
+                escapeState = 0;
+                if (TryTranslateByte(input, out key)) return true;
+                continue;
+            }
+            if (escapeState is 2 or 3)
+            {
+                sequenceLength++;
+                if (sequenceLength > 16) { escapeState = 0; continue; }
+                if (input is >= 0x40 and <= 0x7e)
+                {
+                    key = TranslateSequence(input, escapeState);
+                    escapeState = 0;
+                    if (key != ConsoleKey.NoName) return true;
+                }
+                continue;
+            }
+            if (input == 0x1b) { escapeState = 1; escapeStarted = Stopwatch.GetTimestamp(); continue; }
+            // Count one UTF-8 code point, not each continuation byte.
+            if (input is >= 0xC2 and <= 0xDF) { utf8ContinuationBytes = 1; key = ConsoleKey.NoName; return true; }
+            if (input is >= 0xE0 and <= 0xEF) { utf8ContinuationBytes = 2; key = ConsoleKey.NoName; return true; }
+            if (input is >= 0xF0 and <= 0xF4) { utf8ContinuationBytes = 3; key = ConsoleKey.NoName; return true; }
+            if ((input & 0xC0) == 0x80) continue;
+            if (TryTranslateByte(input, out key)) return true;
+        }
+        if (escapeState == 1 && Stopwatch.GetElapsedTime(escapeStarted) >= TimeSpan.FromMilliseconds(40))
+        {
+            escapeState = 0;
+            key = ConsoleKey.Escape;
+            return true;
+        }
+        return false;
+    }
+
+    private static bool TryTranslateByte(byte input, out ConsoleKey key)
+    {
         key = input switch
         {
             (byte)'q' or (byte)'Q' => ConsoleKey.Q,
             (byte)'t' or (byte)'T' => ConsoleKey.T,
             (byte)'l' or (byte)'L' => ConsoleKey.L,
             (byte)' ' => ConsoleKey.Spacebar,
-            0x1b => ConsoleKey.Escape,
+            0x08 or 0x7f => ConsoleKey.Backspace,
+            0x09 => ConsoleKey.Tab,
+            0x0d or 0x0a => ConsoleKey.Enter,
+            (byte)'0' => ConsoleKey.D0, (byte)'1' => ConsoleKey.D1, (byte)'2' => ConsoleKey.D2,
+            (byte)'3' => ConsoleKey.D3, (byte)'4' => ConsoleKey.D4, (byte)'5' => ConsoleKey.D5,
+            (byte)'6' => ConsoleKey.D6, (byte)'7' => ConsoleKey.D7, (byte)'8' => ConsoleKey.D8, (byte)'9' => ConsoleKey.D9,
+            >= (byte)'A' and <= (byte)'Z' => (ConsoleKey)((int)ConsoleKey.A + input - (byte)'A'),
+            >= (byte)'a' and <= (byte)'z' => (ConsoleKey)((int)ConsoleKey.A + input - (byte)'a'),
+            >= 0x20 and <= 0x7e => ConsoleKey.NoName,
             _ => ConsoleKey.NoName
         };
-        return true;
+        return input is >= 0x20 and <= 0x7e or 0x08 or 0x7f or 0x09 or 0x0d or 0x0a;
     }
+
+    private static ConsoleKey TranslateSequence(byte final, int state) => final switch
+    {
+        (byte)'A' => ConsoleKey.UpArrow, (byte)'B' => ConsoleKey.DownArrow,
+        (byte)'C' => ConsoleKey.RightArrow, (byte)'D' => ConsoleKey.LeftArrow,
+        (byte)'H' => ConsoleKey.Home, (byte)'F' => ConsoleKey.End,
+        (byte)'~' => ConsoleKey.Delete,
+        _ when state == 3 && final is (byte)'P' or (byte)'Q' or (byte)'R' or (byte)'S' => (ConsoleKey)((int)ConsoleKey.F1 + final - (byte)'P'),
+        _ => ConsoleKey.NoName
+    };
 
     public void Dispose()
     {

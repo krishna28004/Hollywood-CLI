@@ -11,8 +11,10 @@ public sealed class BuildLogsModule : IVisualModule
     private int stage;
     public string Title => "BUILD PIPELINE  [CI FIXTURE]";
 
-    public void Update(TimeSpan elapsed, DeterministicRandom random)
+    public void Update(VisualUpdateContext context)
     {
+        var elapsed = context.ScaleElapsed(0.2, 5);
+        var random = context.Random;
         accumulated += elapsed;
         if (accumulated < TimeSpan.FromMilliseconds(900)) return;
         accumulated = TimeSpan.Zero;

@@ -35,13 +35,18 @@ try
     var animatedBytes = session.CapturedByteCount;
     if (animatedBytes <= firstFrameBytes) throw new InvalidOperationException("No terminal output arrived after the first frame; animation did not progress.");
 
-    foreach (var key in new byte[] { (byte)'q', (byte)'t', (byte)'l', (byte)'x', (byte)' ', (byte)0x1b })
+    foreach (var key in new byte[] { (byte)'t', (byte)'l', (byte)'x', (byte)' ', (byte)'x', (byte)'x' })
         await session.SendKeyAsync(key);
-    await Task.Delay(800);
-    if (session.HasExited) throw new InvalidOperationException("An ordinary key exited the scene; only Ctrl+C should stop it.");
+    await Task.Delay(300);
+    if (session.HasExited) throw new InvalidOperationException("A supported shortcut or ordinary key unexpectedly exited the scene.");
+    if (!session.CapturedText.Contains("PAUSED", StringComparison.Ordinal)) throw new InvalidOperationException("Space did not pause the animation/status indicator.");
+    await session.SendKeyAsync((byte)' ');
+    for (var i = 0; i < 20; i++) await session.SendKeyAsync((byte)'x');
+    await Task.Delay(400);
+    if (!session.CapturedText.Contains("INPUT [", StringComparison.Ordinal)) throw new InvalidOperationException("Keyboard activity indicator was not rendered.");
     var ignoredKeyBytes = session.CapturedByteCount;
     await Task.Delay(400);
-    if (session.CapturedByteCount <= ignoredKeyBytes) throw new InvalidOperationException("Animation stopped after ordinary keys were pressed.");
+    if (session.CapturedByteCount <= ignoredKeyBytes) throw new InvalidOperationException("Animation stopped after activity input.");
 
     session.Resize(new PseudoConsoleSession.Coord(42, 12));
     await Task.Delay(500);
@@ -72,10 +77,7 @@ try
     if (!escapeSession.CapturedText.Contains("HOLLYWOOD SIM", StringComparison.Ordinal))
         throw new TimeoutException($"Second launch did not draw a scene within five seconds (exited={escapeSession.HasExited}, code={escapeSession.ExitCode}). Captured tail: {escapeSession.CapturedText[^Math.Min(1200, escapeSession.CapturedText.Length)..]}");
     await escapeSession.SendKeyAsync(0x1b);
-    await Task.Delay(350);
-    if (escapeSession.HasExited) throw new InvalidOperationException("Escape should be ignored; Ctrl+C is the only keyboard exit.");
-    await escapeSession.SendKeyAsync(0x03);
-    if (!await escapeSession.WaitForExitAsync(TimeSpan.FromSeconds(5)) || escapeSession.ExitCode != 130) throw new InvalidOperationException("Ctrl+C did not exit after Escape was ignored.");
+    if (!await escapeSession.WaitForExitAsync(TimeSpan.FromSeconds(5)) || escapeSession.ExitCode != 0) throw new InvalidOperationException("Escape did not exit cleanly.");
 
     using var cancelSession = new PseudoConsoleSession(executable, new PseudoConsoleSession.Coord(80, 24));
     await cancelSession.StartAsync();
@@ -86,10 +88,10 @@ try
         await Task.Delay(50);
     }
     if (!cancelSession.CapturedText.Contains("HOLLYWOOD SIM", StringComparison.Ordinal)) throw new TimeoutException("Third launch did not draw a scene within five seconds.");
-    await cancelSession.SendKeyAsync(0x03);
-    if (!await cancelSession.WaitForExitAsync(TimeSpan.FromSeconds(5)) || cancelSession.ExitCode != 130) throw new InvalidOperationException($"ConPTY Ctrl+C input did not return expected code 130 (got {cancelSession.ExitCode}).");
+    await cancelSession.SendKeyAsync((byte)'q');
+    if (!await cancelSession.WaitForExitAsync(TimeSpan.FromSeconds(5)) || cancelSession.ExitCode != 0) throw new InvalidOperationException("Q did not exit cleanly.");
 
-    Console.WriteLine($"PASS: ConPTY scene/animation (+{animatedBytes - firstFrameBytes} bytes), ignored ordinary keys, tiny/rapid resize, Ctrl+C exit, cursor-show restoration.");
+    Console.WriteLine($"PASS: ConPTY scene/animation (+{animatedBytes - firstFrameBytes} bytes), typing activity, pause/resume, resize, Q/Escape and Ctrl+C exit, cursor restoration.");
     return 0;
 }
 catch (Exception exception)

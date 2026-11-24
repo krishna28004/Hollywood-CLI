@@ -58,8 +58,10 @@ public sealed class CodeStreamModule : IVisualModule
 
     public string Title => $"CODE / {Path.GetFileName(Listings[listingIndex].File)}";
 
-    public void Update(TimeSpan elapsed, DeterministicRandom random)
+    public void Update(VisualUpdateContext context)
     {
+        var elapsed = context.ScaleElapsed(0.25, 3);
+        var random = context.Random;
         accumulated += elapsed;
         while (accumulated >= TimeSpan.FromMilliseconds(480))
         {

@@ -21,8 +21,10 @@ public sealed class AsciiWaveModule : IVisualModule
         }
     }
 
-    public void Update(TimeSpan elapsed, DeterministicRandom random)
+    public void Update(VisualUpdateContext context)
     {
+        var elapsed = context.ScaleElapsed(0.3, 2.7);
+        var random = context.Random;
         accumulated += elapsed;
         while (accumulated >= TimeSpan.FromMilliseconds(110))
         {

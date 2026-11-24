@@ -23,8 +23,8 @@ The renderer remains single-threaded and is the only owner of terminal output du
 
 - Require non-redirected standard input and output for interactive mode. Redirected output is rejected before emitting escape sequences; `--snapshot` remains the plain-text path.
 - Reject `TERM=dumb`. Other interactive TERM values use common xterm-compatible alternate-screen and cursor sequences, with color reduced to 16 colors when truecolor/256-color support is not advertised.
-- Use `Console.WindowWidth`/`WindowHeight` for viewport polling and `Console.KeyAvailable`/`Console.ReadKey(intercept: true)` for non-echoing key input. Resize is handled by polling dimensions each frame; the renderer clears and redraws when the canvas dimensions change.
-- Do not change termios explicitly. .NET owns its terminal-aware key-read behavior, so this application avoids duplicating kernel input-mode transitions and avoids assuming Linux and Darwin share a binary `termios` layout. This is a design choice to validate with PTYs on both systems, not evidence that all terminal hosts behave identically.
+- Use `Console.WindowWidth`/`WindowHeight` for viewport polling and a platform-specific POSIX `termios` adapter for nonblocking byte input. Linux and Darwin use separate native layouts and declarations. The input parser treats UTF-8 code points and common CSI/SS3 keys as logical events, ignores unknown terminal responses, and emits a lone Escape after a short ambiguity timeout. Resize is handled by polling dimensions each frame; the renderer clears and redraws when the canvas dimensions change.
+- Keep ISIG enabled so Ctrl+C follows the cancellation path. Restore the original terminal attributes during adapter disposal. This remains pending Linux/macOS PTY validation and is not evidence that every terminal host behaves identically.
 - `Console.CancelKeyPress` handles Ctrl+C/SIGINT. On .NET 10, SIGTERM needs explicit registration for graceful application shutdown; a POSIX-only `PosixSignalRegistration` cancels the default termination and signals the shared cancellation token. Both paths exit through the terminal-session disposal path.
 - Do not call `stty`, `tput`, or a shell. If PTY tests find a host where the .NET Console APIs cannot provide required behavior, evaluate a small platform-specific native adapter with separately validated Linux and Darwin ABI declarations before adding it.
 - On acquisition failure, return a clear error without entering the alternate screen. Disposal emits reset, cursor-show, and alternate-screen-leave sequences on controlled exits. Forced kill or power loss can still prevent cleanup.
@@ -64,7 +64,7 @@ Current assumptions to validate:
 3. .NET's `Console.WindowWidth` and `WindowHeight` observe SIGWINCH-driven PTY size changes on both Linux and macOS.
 4. ConPTY/Windows behavior remains unchanged after introducing the factory and interface.
 
-Experiments: run the Python stdlib PTY test on Ubuntu and macOS runners; run ConPTY on Windows x64 and ARM64; then inspect Windows Terminal, Console Host, GNOME Terminal, Konsole, SSH/tmux, Terminal.app, and iTerm2 manually. The harness verifies scene output, animation, ignored ordinary keys, resize, Ctrl+C, and cursor-show output. It cannot substitute for those visible terminal checks.
+Experiments: run the Python stdlib PTY test on Ubuntu and macOS runners; run ConPTY on Windows x64 and ARM64; then inspect Windows Terminal, Console Host, GNOME Terminal, Konsole, SSH/tmux, Terminal.app, and iTerm2 manually. The harness verifies scene output, animation, keyboard activity, pause/resume, shortcuts, resize, Ctrl+C, and cursor restoration. It cannot substitute for those visible terminal checks.
 
 ## Deployment notes
 

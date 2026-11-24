@@ -9,6 +9,13 @@
   "colorMode": "auto",
   "glyphMode": "ascii",
   "reducedMotion": false,
+  "keyboardReactive": {
+    "enabled": true,
+    "idleIntensity": 0.05,
+    "maximumIntensity": 1.0,
+    "sensitivity": 1.0,
+    "cooldownSeconds": 3.0
+  },
   "telemetryMode": "simulated",
   "enabledModules": [
     "code",
@@ -17,8 +24,10 @@
     "network",
     "security",
     "data",
+    "radar",
     "topology",
     "build",
-    "dashboard"
+    "dashboard",
+    "rain"
   ]
 }

@@ -25,7 +25,7 @@ dotnet run --project tests/Hollywood.ConPty -c Release -- artifacts/win-x64/holl
 
 On Linux and macOS, use `dotnet run --project src/Hollywood.Cli` from an interactive terminal while developing. Native self-contained archives are not yet published; CI is being expanded to build and test the six target operating-system/architecture combinations.
 
-The executable supports five themes (`classic`, `cyberpunk`, `soc`, `matrix`, `retro`), layouts (`auto`, `focus`, `dense`), panel counts (2, 3, 6, 7, 10), speed (`slow`, `normal`, `fast`), frame caps (1–60), reduced motion, and deterministic seeds. The default scene uses seven panels with a large code stream, system process table, network graph, packet feed, event log, data stream, and topology. Ctrl+C exits; other keyboard input is ignored so typing does not accidentally dismiss the scene. `--snapshot` writes plain text without terminal control sequences.
+The executable supports five themes (`classic`, `cyberpunk`, `soc`, `matrix`, `retro`), layouts (`auto`, `focus`, `dense`), panel counts (2, 3, 6, 7, 10), speed (`slow`, `normal`, `fast`), frame caps (1–60), reduced motion, deterministic seeds, and keyboard-reactive animation. The default scene uses seven panels with a large code stream, system process table, network graph, packet feed, event log, data stream, and topology. Ordinary keys anonymously raise simulation activity; it cools down smoothly after typing stops. Q/Esc exits, Ctrl+C cancels, Space pauses/resumes, T cycles themes, and L cycles layouts. Use `--keyboard-reactive off` to disable activity response. `--snapshot` writes plain text without terminal control sequences.
 
 The visual concept used for this refresh is [shown here](docs/visuals/linux-hollywood-reference-concept.png). It approximates the classic Linux Hollywood multi-pane style. The linked YouTube Short could not be inspected at the requested 20-second point in this environment, so this image is not claimed to reproduce that exact frame.
 
@@ -39,7 +39,7 @@ hollywood config show
 hollywood config validate [PATH]
 ```
 
-Schema version 1 supports theme, layout, panel count, speed, frame-rate limit, deterministic seed, color mode, ASCII glyph mode, reduced motion, simulated telemetry mode, and enabled modules. The parser rejects unknown fields, duplicate keys, unsupported versions, invalid values, files larger than 64 KiB, and excessive JSON nesting. A ready-to-copy example is in [examples/config.json](examples/config.json). Panel rotation and Unicode glyphs are not implemented.
+Schema version 1 supports theme, layout, panel count, speed, frame-rate limit, deterministic seed, color mode, ASCII glyph mode, reduced motion, simulated telemetry mode, enabled modules, and `keyboardReactive` settings (`enabled`, `idleIntensity`, `maximumIntensity`, `sensitivity`, `cooldownSeconds`). CLI overrides take precedence. The parser rejects unknown fields, duplicate keys, unsupported versions, invalid values, files larger than 64 KiB, and excessive JSON nesting. A ready-to-copy example is in [examples/config.json](examples/config.json). Panel rotation and Unicode glyphs are not implemented.
 
 ## Distribution
 

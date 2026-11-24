@@ -78,6 +78,28 @@ var first = new DeterministicRandom(12345);
 var second = new DeterministicRandom(12345);
 for (var i = 0; i < 1000; i++) Check(first.NextUInt() == second.NextUInt(), "Seeded random streams diverged.");
 
+var manualClock = new ManualTimeProvider();
+var activityController = new KeyboardActivityController(manualClock, cooldownSeconds: 3d);
+Check(Math.Abs(activityController.Update() - 0.05f) < 0.001f, "Keyboard activity did not begin at idle intensity.");
+activityController.RecordKeyEvent();
+var singleKeyActivity = activityController.Update();
+Check(singleKeyActivity > 0.05f && singleKeyActivity < 0.25f, "An isolated key did not produce a small bounded activity increase.");
+for (var i = 0; i < 40; i++) activityController.RecordKeyEvent();
+var rapidActivity = activityController.Update();
+Check(rapidActivity > 0.9f && rapidActivity <= 1f, "Rapid key events did not reach high bounded activity.");
+manualClock.Advance(TimeSpan.FromSeconds(1));
+var coolingActivity = activityController.Update();
+Check(coolingActivity < rapidActivity && coolingActivity > 0.05f, "Activity did not decay smoothly after input stopped.");
+manualClock.Advance(TimeSpan.FromSeconds(8));
+Check(activityController.Update() < 0.1f, "Activity did not return near idle after cooldown.");
+activityController.SetPaused(true);
+for (var i = 0; i < 10; i++) activityController.RecordKeyEvent();
+Check(Math.Abs(activityController.Update() - 0.05f) < 0.001f, "Paused activity controller did not stay idle.");
+activityController.SetPaused(false);
+activityController.SetEnabled(false);
+activityController.RecordKeyEvent();
+Check(Math.Abs(activityController.Update() - 0.05f) < 0.001f, "Disabled activity controller accepted key activity.");
+
 var configPath = Path.Combine(Path.GetTempPath(), $"hollywood-config-test-{Guid.NewGuid():N}.json");
 if (OperatingSystem.IsWindows())
     Check(AppConfiguration.DefaultPath.EndsWith(Path.Combine("Hollywood", "config.json"), StringComparison.Ordinal), "Windows config path must use LocalAppData/Hollywood.");
@@ -105,6 +127,8 @@ try
     {
         "{\"schemaVersion\":2}",
         "{\"schemaVersion\":1,\"theme\":\"unknown\"}",
+        "{\"schemaVersion\":1,\"keyboardReactive\":{\"enabled\":true,\"idleIntensity\":0.9,\"maximumIntensity\":0.5}}",
+        "{\"schemaVersion\":1,\"keyboardReactive\":{\"sensitivity\":99}}",
         "{\"schemaVersion\":1,\"unexpected\":true}",
         "{\"schemaVersion\":1,\"panels\":6,\"panels\":10}"
     })
@@ -128,7 +152,7 @@ IVisualModule[] modules =
 var flagshipLayout = LayoutSolver.Solve(120, 30, 7);
 var flagship = new Canvas(120, 30);
 var moduleRandom = new DeterministicRandom(9876);
-foreach (var module in modules) module.Update(TimeSpan.FromSeconds(3), moduleRandom);
+foreach (var module in modules) module.Update(new VisualUpdateContext(TimeSpan.FromSeconds(3), moduleRandom, 0.6f));
 for (var index = 0; index < flagshipLayout.Count; index++) modules[index].Render(flagship, flagshipLayout[index], TimeSpan.FromSeconds(3));
 var flagshipText = flagship.ToPlainText();
 foreach (var module in modules.Take(7)) Check(flagshipText.Contains(module.Title, StringComparison.Ordinal), $"Flagship panel missing title {module.Title}.");
@@ -148,8 +172,8 @@ var radarFrameA = new Canvas(50, 16);
 var radarFrameB = new Canvas(50, 16);
 for (var tick = 0; tick < 8; tick++)
 {
-    radarA.Update(TimeSpan.FromMilliseconds(100), radarASeed);
-    radarB.Update(TimeSpan.FromMilliseconds(100), radarBSeed);
+    radarA.Update(new VisualUpdateContext(TimeSpan.FromMilliseconds(100), radarASeed, 0.4f));
+    radarB.Update(new VisualUpdateContext(TimeSpan.FromMilliseconds(100), radarBSeed, 0.4f));
 }
 radarA.Render(radarFrameA, radarBounds, TimeSpan.FromSeconds(1));
 radarB.Render(radarFrameB, radarBounds, TimeSpan.FromSeconds(1));
@@ -171,14 +195,22 @@ for (var x = 0; x < resizedCanvas.Width; x++)
 
 radarA.Suspend();
 var pausedFrame = radarFrameA.CopyCells();
-radarA.Update(TimeSpan.FromSeconds(3), radarASeed);
+radarA.Update(new VisualUpdateContext(TimeSpan.FromSeconds(3), radarASeed, 0.9f));
 radarA.Render(radarFrameA, radarBounds, TimeSpan.FromSeconds(4));
 Check(radarFrameA.CopyCells().SequenceEqual(pausedFrame), "Suspended radar animation continued updating.");
 radarA.Resume();
-radarA.Update(TimeSpan.FromSeconds(1), radarASeed);
+radarA.Update(new VisualUpdateContext(TimeSpan.FromSeconds(1), radarASeed, 0.9f));
 radarA.Render(radarFrameA, radarBounds, TimeSpan.FromSeconds(5));
 Check(!radarFrameA.CopyCells().SequenceEqual(pausedFrame), "Resumed radar sweep did not advance.");
 radarA.Dispose();
 radarB.Dispose();
 
-Console.WriteLine("PASS: clipping, borders, 96,000 layout cases, flagship seven-panel and dense ten-panel layouts, eleven visual modules, deterministic animated radar, pause/resume, VT diffing, bottom-right protection, deterministic PRNG, five-theme configuration validation");
+Console.WriteLine("PASS: clipping, borders, 96,000 layout cases, flagship/dense modules, deterministic radar, activity attack/cooldown/pause/disable, VT diffing, bottom-right protection, deterministic PRNG, configuration validation");
+
+sealed class ManualTimeProvider : TimeProvider
+{
+    private long timestamp;
+    public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+    public override long GetTimestamp() => timestamp;
+    public void Advance(TimeSpan duration) => timestamp += duration.Ticks;
+}

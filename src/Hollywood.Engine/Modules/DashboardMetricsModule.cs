@@ -10,8 +10,10 @@ public sealed class DashboardMetricsModule : IVisualModule
     private TimeSpan accumulated;
     public string Title => "OPS COUNTERS  [FIXTURE]";
 
-    public void Update(TimeSpan elapsed, DeterministicRandom random)
+    public void Update(VisualUpdateContext context)
     {
+        var elapsed = context.ScaleElapsed(0.2, 4);
+        var random = context.Random;
         accumulated += elapsed;
         if (accumulated < TimeSpan.FromMilliseconds(750)) return;
         accumulated = TimeSpan.Zero;

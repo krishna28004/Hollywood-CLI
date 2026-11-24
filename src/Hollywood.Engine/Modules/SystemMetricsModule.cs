@@ -19,8 +19,10 @@ public sealed class SystemMetricsModule : IVisualModule
     private TimeSpan uptime;
     public string Title => "SYSTEM LOAD";
 
-    public void Update(TimeSpan elapsed, DeterministicRandom random)
+    public void Update(VisualUpdateContext context)
     {
+        var elapsed = context.ScaleElapsed(0.35, 2.5);
+        var random = context.Random;
         uptime += elapsed;
         accumulated += elapsed;
         while (accumulated >= TimeSpan.FromMilliseconds(240))

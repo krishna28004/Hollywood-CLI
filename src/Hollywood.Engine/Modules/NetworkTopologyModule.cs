@@ -11,8 +11,10 @@ public sealed class NetworkTopologyModule : IVisualModule
     private TimeSpan accumulated;
     public string Title => "NETWORK MAP";
 
-    public void Update(TimeSpan elapsed, DeterministicRandom random)
+    public void Update(VisualUpdateContext context)
     {
+        var elapsed = context.ScaleElapsed(0.25, 4);
+        var random = context.Random;
         accumulated += elapsed;
         while (accumulated >= TimeSpan.FromMilliseconds(240))
         {

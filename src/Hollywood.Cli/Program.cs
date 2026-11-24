@@ -15,7 +15,7 @@ internal static class Program
     private sealed record Options(
         bool Help, bool ShowVersion, bool Snapshot, bool ReducedMotion,
         int Theme, int Panels, uint Seed, int FrameRate, string Speed, string ColorMode,
-        string[] EnabledModules);
+        string[] EnabledModules, KeyboardReactiveConfiguration KeyboardReactive);
 
     private static int Main(string[] args)
     {
@@ -110,26 +110,39 @@ internal static class Program
         var previous = clock.Elapsed;
         var requestedCount = options.Panels;
         var interval = TimeSpan.FromSeconds(1d / options.FrameRate);
+        var activity = new KeyboardActivityController(TimeProvider.System, options.KeyboardReactive.Enabled,
+            options.KeyboardReactive.IdleIntensity, options.KeyboardReactive.MaximumIntensity,
+            options.KeyboardReactive.Sensitivity, options.KeyboardReactive.CooldownSeconds);
+        var paused = false;
+        var currentActivity = activity.Activity;
 
         while (!token.IsCancellationRequested)
         {
             var frameStart = clock.Elapsed;
-            // Drain ordinary keys so they cannot accumulate. Ctrl+C is delivered through
-            // the host's processed-input/signal path and remains the only keyboard action.
-            while (terminal.TryReadKey(out _)) { }
+            // Bound input work per frame and never retain the key identity.
+            for (var inputCount = 0; inputCount < KeyboardActivityController.MaximumEventsPerUpdate && terminal.TryReadKey(out var key); inputCount++)
+            {
+                if (key is ConsoleKey.Q or ConsoleKey.Escape) return;
+                if (key == ConsoleKey.Spacebar) { paused = !paused; activity.SetPaused(paused); continue; }
+                if (key == ConsoleKey.T) { renderer.ThemeIndex = (renderer.ThemeIndex + 1) % 5; continue; }
+                if (key == ConsoleKey.L) { requestedCount = requestedCount switch { 2 => 7, 7 => 10, _ => 2 }; continue; }
+                activity.RecordKeyEvent();
+            }
 
             terminal.RefreshSize();
             var now = clock.Elapsed;
             var elapsed = now - previous;
             previous = now;
-            if (options.ReducedMotion) elapsed = Scale(elapsed, 0.35);
-            else elapsed = Scale(elapsed, options.Speed switch { "slow" => 0.6, "fast" => 1.7, _ => 1.0 });
+            currentActivity = activity.Update();
+            if (options.ReducedMotion) { currentActivity = Math.Min(currentActivity, 0.08f); elapsed = Scale(elapsed, 0.35); }
+            elapsed = Scale(elapsed, options.Speed switch { "slow" => 0.6, "fast" => 1.7, _ => 1.0 });
             var activeCount = Math.Min(VisiblePanelCount(terminal.Width, terminal.Height, requestedCount), modules.Length);
-            if (activeCount > 0)
-                for (var index = 0; index < activeCount; index++) modules[index].Update(elapsed, random);
+            if (!paused && activeCount > 0)
+                for (var index = 0; index < activeCount; index++) modules[index].Update(new VisualUpdateContext(elapsed, random, currentActivity));
 
-            RenderFrame(terminal.Width, terminal.Height, modules, activeCount, clock.Elapsed, options, renderer);
-            var remaining = interval - (clock.Elapsed - frameStart);
+            RenderFrame(terminal.Width, terminal.Height, modules, activeCount, clock.Elapsed, options, renderer, currentActivity, paused);
+            var desiredInterval = paused || currentActivity < 0.1f ? TimeSpan.FromSeconds(1d / Math.Min(options.FrameRate, 6)) : interval;
+            var remaining = desiredInterval - (clock.Elapsed - frameStart);
             if (remaining > TimeSpan.Zero) Thread.Sleep(remaining);
         }
     }
@@ -159,7 +172,7 @@ internal static class Program
         return requested;
     }
 
-    private static void RenderFrame(int width, int height, IVisualModule[] modules, int activeCount, TimeSpan elapsed, Options options, VtRenderer renderer)
+    private static void RenderFrame(int width, int height, IVisualModule[] modules, int activeCount, TimeSpan elapsed, Options options, VtRenderer renderer, float activity = 0.05f, bool paused = false)
     {
         if (width < 20 || height < 7)
         {
@@ -176,7 +189,9 @@ internal static class Program
         canvas.Write(0, 0, "UBUNTU 24.04 // HOLLYWOOD SIM |", 1);
         canvas.Write(32, 0, $"node: ubuntu-lab | kernel: 6.8.0-52 | up {seconds / 86400:D1}d {seconds / 3600 % 24:D2}:{seconds / 60 % 60:D2}:{seconds % 60:D2} | sessions: 3 | load: {load:0.00} {load + 0.04:0.00} {load + 0.11:0.00} | eth0: UP | {DateTime.UtcNow:HH:mm:ss}Z", 6);
         for (var i = 0; i < rects.Count; i++) modules[i].Render(canvas, rects[i], elapsed);
-        canvas.Write(1, height - 1, "^C EXIT  |  SYNTHETIC DATA  |  NO LIVE NETWORK ACTIVITY", 3);
+        var activityBar = new string('#', (int)Math.Round(Math.Clamp(activity, 0f, 1f) * 10)).PadRight(10, '.');
+        var activityText = options.KeyboardReactive.Enabled ? $"INPUT [{activityBar}] {activity:P0}" : "INPUT REACTIVE OFF";
+        canvas.Write(1, height - 1, $"Q/ESC EXIT | SPACE PAUSE | T THEME | L LAYOUT | {activityText}{(paused ? " | PAUSED" : "")} | SYNTHETIC", 3);
         renderer.Write(canvas);
     }
 
@@ -189,11 +204,14 @@ internal static class Program
             var random = new DeterministicRandom(options.Seed);
             var canvas = new Canvas(width, height);
             var rects = LayoutSolver.Solve(width, height, options.Panels);
-            for (var tick = 0; tick < 18; tick++) foreach (var module in modules) module.Update(TimeSpan.FromMilliseconds(500), random);
+            for (var tick = 0; tick < 18; tick++) foreach (var module in modules) module.Update(new VisualUpdateContext(TimeSpan.FromMilliseconds(500), random, 0.05f));
             for (var index = 0; index < Math.Min(rects.Count, modules.Length); index++) modules[index].Render(canvas, rects[index], TimeSpan.FromSeconds(9));
             canvas.Write(0, 0, "UBUNTU 24.04 // HOLLYWOOD SIM |", 1);
             canvas.Write(32, 0, "node: ubuntu-lab | kernel: 6.8.0-52 | up 0d 00:00:09 | sessions: 3 | load: 0.72 0.76 0.83 | eth0: UP | 14:37:20Z", 6);
-            canvas.Write(1, height - 1, "^C EXIT  |  SYNTHETIC DATA  |  NO LIVE NETWORK ACTIVITY", 3);
+            var footer = options.KeyboardReactive.Enabled
+                ? "Q/ESC EXIT | SPACE PAUSE | T THEME | L LAYOUT | INPUT [#.........] 5% | SYNTHETIC"
+                : "Q/ESC EXIT | SPACE PAUSE | T THEME | L LAYOUT | INPUT REACTIVE OFF | SYNTHETIC";
+            canvas.Write(1, height - 1, footer, 3);
             Console.WriteLine(canvas.ToPlainText());
         }
         finally { foreach (var module in modules) module.Dispose(); }
@@ -205,7 +223,7 @@ internal static class Program
         var configSpecified = false;
         var loadConfig = true;
         var help = false; var showVersion = false; var snapshot = false; var reduced = (bool?)null;
-        int? themeOverride = null; int? panelsOverride = null; uint? seedOverride = null; int? frameRateOverride = null; string? speedOverride = null;
+        int? themeOverride = null; int? panelsOverride = null; uint? seedOverride = null; int? frameRateOverride = null; string? speedOverride = null; bool? keyboardReactiveOverride = null;
         error = string.Empty;
         for (var index = 0; index < args.Length; index++)
         {
@@ -214,7 +232,7 @@ internal static class Program
             if (argument == "--version") { showVersion = true; continue; }
             if (argument == "--snapshot") { snapshot = true; continue; }
             if (argument == "--no-config") { loadConfig = false; continue; }
-            if (argument is "--config" or "--theme" or "--panels" or "--layout" or "--seed" or "--speed" or "--fps")
+            if (argument is "--config" or "--theme" or "--panels" or "--layout" or "--seed" or "--speed" or "--fps" or "--keyboard-reactive")
             {
                 if (++index >= args.Length) { error = $"{argument} requires a value."; options = default!; return false; }
                 var value = args[index];
@@ -243,6 +261,9 @@ internal static class Program
                     case "--fps":
                         if (!int.TryParse(value, out var fps) || fps is < 1 or > 60) { error = "Frame rate must be between 1 and 60."; options = default!; return false; }
                         frameRateOverride = fps; break;
+                    case "--keyboard-reactive":
+                        if (value is not ("on" or "off")) { error = "--keyboard-reactive must be on or off."; options = default!; return false; }
+                        keyboardReactiveOverride = value == "on"; break;
                 }
                 continue;
             }
@@ -254,7 +275,7 @@ internal static class Program
         if (help || showVersion)
         {
             var defaults = new AppConfiguration();
-            options = new Options(help, showVersion, false, false, ParseTheme(defaults.Theme), defaults.Panels, defaults.Seed, defaults.FrameRateLimit, defaults.Speed, defaults.ColorMode, defaults.EnabledModules);
+            options = new Options(help, showVersion, false, false, ParseTheme(defaults.Theme), defaults.Panels, defaults.Seed, defaults.FrameRateLimit, defaults.Speed, defaults.ColorMode, defaults.EnabledModules, defaults.KeyboardReactive);
             return true;
         }
         try
@@ -267,10 +288,11 @@ internal static class Program
                 Seed = seedOverride ?? config.Seed,
                 Speed = speedOverride ?? config.Speed,
                 FrameRateLimit = frameRateOverride ?? config.FrameRateLimit,
-                ReducedMotion = reduced ?? config.ReducedMotion
+                ReducedMotion = reduced ?? config.ReducedMotion,
+                KeyboardReactive = config.KeyboardReactive with { Enabled = keyboardReactiveOverride ?? config.KeyboardReactive.Enabled }
             };
             config.Validate();
-            options = new Options(help, showVersion, snapshot, config.ReducedMotion, ParseTheme(config.Theme), config.Panels, config.Seed, config.ReducedMotion ? Math.Min(config.FrameRateLimit, 8) : config.FrameRateLimit, config.Speed, config.ColorMode, config.EnabledModules);
+            options = new Options(help, showVersion, snapshot, config.ReducedMotion, ParseTheme(config.Theme), config.Panels, config.Seed, config.ReducedMotion ? Math.Min(config.FrameRateLimit, 8) : config.FrameRateLimit, config.Speed, config.ColorMode, config.EnabledModules, config.KeyboardReactive);
             return true;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidDataException)
@@ -283,7 +305,7 @@ internal static class Program
     private static string ThemeKey(int theme) => theme switch { 0 => "classic", 1 => "cyberpunk", 2 => "soc", 3 => "matrix", 4 => "retro", _ => "" };
     private static string ThemeName(int theme) => theme switch { 1 => "CYBERPUNK", 2 => "SOC", 3 => "MATRIX", 4 => "RETRO AMBER", _ => "CLASSIC" };
 
-    private static void PrintHelp() => Console.WriteLine($"Hollywood CLI {Version}\n\nUsage: hollywood [--help|--version|--snapshot] [--config PATH|--no-config] [--theme classic|cyberpunk|soc|matrix|retro] [--panels 2|3|6|7|10] [--layout auto|focus|dense] [--speed slow|normal|fast] [--fps 1..60] [--reduced-motion] [--seed N]\n\nConfig: hollywood config path|show|validate [PATH]\nInteractive key: Ctrl+C exits. Other keys are ignored.\nAll displayed activity is synthetic; no network traffic is sent.");
+    private static void PrintHelp() => Console.WriteLine($"Hollywood CLI {Version}\n\nUsage: hollywood [--help|--version|--snapshot] [--config PATH|--no-config] [--theme classic|cyberpunk|soc|matrix|retro] [--panels 2|3|6|7|10] [--layout auto|focus|dense] [--speed slow|normal|fast] [--fps 1..60] [--keyboard-reactive on|off] [--reduced-motion] [--seed N]\n\nConfig: hollywood config path|show|validate [PATH]\nInteractive keys: Q/Esc quit, Ctrl+C cancel, Space pause/resume, T theme, L layout. Other keys anonymously increase simulation activity.\nAll displayed activity is synthetic; no network traffic is sent.");
 
     private static IVisualModule[] CreateModules(string[] enabled)
     {

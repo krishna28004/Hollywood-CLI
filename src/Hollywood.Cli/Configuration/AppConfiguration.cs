@@ -15,6 +15,7 @@ public sealed record AppConfiguration
     public string ColorMode { get; init; } = "auto";
     public string GlyphMode { get; init; } = "ascii";
     public bool ReducedMotion { get; init; }
+    public KeyboardReactiveConfiguration KeyboardReactive { get; init; } = new();
     public string TelemetryMode { get; init; } = "simulated";
     public string[] EnabledModules { get; init; } = [
         "code", "system", "wave", "network", "security", "data", "radar", "topology", "build", "dashboard", "rain"
@@ -72,6 +73,7 @@ public sealed record AppConfiguration
         if (ColorMode is not ("auto" or "truecolor" or "16color" or "mono")) throw new InvalidDataException("colorMode must be auto, truecolor, 16color, or mono.");
         if (GlyphMode != "ascii") throw new InvalidDataException("Only ASCII glyph mode is currently supported.");
         if (TelemetryMode != "simulated") throw new InvalidDataException("Only simulated telemetry is currently supported.");
+        KeyboardReactive.Validate();
         if (EnabledModules.Length is < 1 or > 11) throw new InvalidDataException("enabledModules must contain between 1 and 11 module names.");
         var allowed = new HashSet<string>(["code", "network", "rain", "data", "security", "system", "build", "wave", "radar", "topology", "dashboard"], StringComparer.Ordinal);
         if (EnabledModules.Any(name => !allowed.Contains(name)) || EnabledModules.Distinct(StringComparer.Ordinal).Count() != EnabledModules.Length)
@@ -100,5 +102,22 @@ public sealed record AppConfiguration
             var index = 0;
             foreach (var item in element.EnumerateArray()) RejectDuplicateProperties(item, $"{path}[{index++}]");
         }
+    }
+}
+
+public sealed record KeyboardReactiveConfiguration
+{
+    public bool Enabled { get; init; } = true;
+    public float IdleIntensity { get; init; } = 0.05f;
+    public float MaximumIntensity { get; init; } = 1f;
+    public float Sensitivity { get; init; } = 1f;
+    public double CooldownSeconds { get; init; } = 3d;
+
+    public void Validate()
+    {
+        if (!float.IsFinite(IdleIntensity) || IdleIntensity is < 0f or > 1f) throw new InvalidDataException("keyboardReactive.idleIntensity must be between 0 and 1.");
+        if (!float.IsFinite(MaximumIntensity) || MaximumIntensity < IdleIntensity || MaximumIntensity > 1f) throw new InvalidDataException("keyboardReactive.maximumIntensity must be between idleIntensity and 1.");
+        if (!float.IsFinite(Sensitivity) || Sensitivity is < 0.1f or > 5f) throw new InvalidDataException("keyboardReactive.sensitivity must be between 0.1 and 5.");
+        if (!double.IsFinite(CooldownSeconds) || CooldownSeconds is < 0.5d or > 10d) throw new InvalidDataException("keyboardReactive.cooldownSeconds must be between 0.5 and 10.");
     }
 }

@@ -33,8 +33,10 @@ public sealed class SecurityFeedModule : IVisualModule
         for (var index = 0; index < 10; index++) AddEntry(Events[index], (byte)(index == 0 || index == 8 ? 5 : index == 1 ? 2 : 0));
     }
 
-    public void Update(TimeSpan elapsed, DeterministicRandom random)
+    public void Update(VisualUpdateContext context)
     {
+        var elapsed = context.ScaleElapsed(0.2, 4);
+        var random = context.Random;
         accumulated += elapsed;
         while (accumulated >= TimeSpan.FromMilliseconds(155))
         {

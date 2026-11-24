@@ -33,8 +33,10 @@ public sealed class RadarModule : IVisualModule
     public void Suspend() => suspended = true;
     public void Resume() => suspended = false;
 
-    public void Update(TimeSpan elapsed, DeterministicRandom random)
+    public void Update(VisualUpdateContext context)
     {
+        var elapsed = context.ScaleElapsed(0.3, 3);
+        var random = context.Random;
         if (suspended) return;
 
         elapsedSeconds = (elapsedSeconds + elapsed.TotalSeconds) % 1.2;
