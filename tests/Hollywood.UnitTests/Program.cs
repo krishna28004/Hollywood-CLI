@@ -11,6 +11,20 @@ static void Check(bool condition, string message)
     if (!condition) throw new InvalidOperationException(message);
 }
 
+static float MeasureSteadyActivity(int keysPerSecond)
+{
+    var time = new ManualTimeProvider();
+    var controller = new KeyboardActivityController(time);
+    var interval = TimeSpan.FromSeconds(1d / keysPerSecond);
+    for (var index = 0; index < keysPerSecond * 3; index++)
+    {
+        controller.RecordKeyEvent();
+        time.Advance(interval);
+        controller.Update();
+    }
+    return controller.Activity;
+}
+
 var canvas = new Canvas(20, 8);
 canvas.Write(-2, 0, "ABCD");
 Check(canvas[0, 0].Character == 'C' && canvas[1, 0].Character == 'D', "Clipped text did not respect canvas bounds.");
@@ -90,8 +104,16 @@ Check(rapidActivity > 0.9f && rapidActivity <= 1f, "Rapid key events did not rea
 manualClock.Advance(TimeSpan.FromSeconds(1));
 var coolingActivity = activityController.Update();
 Check(coolingActivity < rapidActivity && coolingActivity > 0.05f, "Activity did not decay smoothly after input stopped.");
-manualClock.Advance(TimeSpan.FromSeconds(8));
+manualClock.Advance(TimeSpan.FromSeconds(10));
 Check(activityController.Update() < 0.1f, "Activity did not return near idle after cooldown.");
+var slowTypingActivity = MeasureSteadyActivity(2);
+var moderateTypingActivity = MeasureSteadyActivity(5);
+var rapidTypingActivity = MeasureSteadyActivity(10);
+Check(slowTypingActivity is >= 0.15f and < 0.4f, $"Slow typing activity was outside its expected light range: {slowTypingActivity:0.00}.");
+Check(moderateTypingActivity > slowTypingActivity && moderateTypingActivity is >= 0.4f and < 0.75f, $"Moderate typing did not produce a moderate increase: {moderateTypingActivity:0.00}.");
+Check(rapidTypingActivity > moderateTypingActivity && rapidTypingActivity >= 0.85f, $"Rapid typing did not approach maximum activity: {rapidTypingActivity:0.00}.");
+for (var i = 0; i < 1_000; i++) activityController.RecordKeyEvent();
+Check(activityController.Update() <= 1f, "A held/repeated key exceeded the activity cap.");
 activityController.SetPaused(true);
 for (var i = 0; i < 10; i++) activityController.RecordKeyEvent();
 Check(Math.Abs(activityController.Update() - 0.05f) < 0.001f, "Paused activity controller did not stay idle.");
@@ -205,7 +227,7 @@ Check(!radarFrameA.CopyCells().SequenceEqual(pausedFrame), "Resumed radar sweep 
 radarA.Dispose();
 radarB.Dispose();
 
-Console.WriteLine("PASS: clipping, borders, 96,000 layout cases, flagship/dense modules, deterministic radar, activity attack/cooldown/pause/disable, VT diffing, bottom-right protection, deterministic PRNG, configuration validation");
+Console.WriteLine($"PASS: clipping, borders, 96,000 layouts, all modules/radar, keyboard activity rates (2/s {slowTypingActivity:P0}, 5/s {moderateTypingActivity:P0}, 10/s {rapidTypingActivity:P0}), cooldown/pause/disable/cap, VT diffing, PRNG, configuration");
 
 sealed class ManualTimeProvider : TimeProvider
 {

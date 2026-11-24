@@ -20,6 +20,7 @@ Shortcuts: Q or Escape exits; Ctrl+C cancels; Space pauses/resumes; T cycles the
 
 - `dotnet build Hollywood.sln -c Release -m:1`: passed, zero warnings and errors.
 - `tests/Hollywood.UnitTests`: passed, including injected-clock idle, isolated input, rapid input, smooth cooldown, paused/disabled states, invalid configuration, all module layouts, radar determinism, and rendering bounds.
+- Injected-clock rate check after three seconds measured 26% activity at 2 keys/s, 50% at 5 keys/s, and 90% at 10 keys/s. This confirms the intended light/moderate/high response curve with the default sensitivity.
 - `tests/Hollywood.ConPty` against the Windows x64 apphost: passed scene/animation, typing activity, Space pause/resume, resize, Q/Escape exit, Ctrl+C exit code 130, and cursor restoration.
 - These checks exercise Windows ConPTY, not visible Windows Terminal/Console Host. Linux/macOS PTY and real terminal emulator checks remain pending. CPU and memory benchmarks have not yet been collected.
 

@@ -4,7 +4,7 @@ namespace Hollywood.Engine.Simulation;
 public sealed class KeyboardActivityController
 {
     public const int MaximumEventsPerUpdate = 64;
-    private const double ImpulsePerKey = 0.10;
+    private const double ImpulsePerKey = 0.09;
 
     private readonly TimeProvider clock;
     private readonly float idleIntensity;
@@ -68,10 +68,7 @@ public sealed class KeyboardActivityController
 
         pressure *= Math.Exp(-seconds / decayTimeConstantSeconds);
         if (pendingEvents > 0)
-        {
-            var impulse = 1d - Math.Exp(-ImpulsePerKey * sensitivity * pendingEvents);
-            pressure = 1d - (1d - pressure) * (1d - impulse);
-        }
+            pressure += ImpulsePerKey * sensitivity * pendingEvents;
         pendingEvents = 0;
         pressure = Math.Clamp(pressure, 0d, 1d);
         Activity = idleIntensity + (maximumIntensity - idleIntensity) * (float)pressure;
