@@ -1,60 +1,142 @@
 # Hollywood CLI
 
-A native .NET character-cell terminal simulation inspired by Linux Hollywood. It renders fictional operations dashboards inside one terminal canvas on Windows, Linux, and macOS. It performs no network traffic, security scanning, command execution, or file changes during normal operation.
+Hollywood CLI turns an interactive terminal into a fictional, animated operations dashboard inspired by the multi-pane Linux `hollywood` experience. It is built with .NET and runs its panels in one terminal canvas.
 
-## Requirements
+**Safety:** Hollywood displays synthetic activity. It does not scan networks, send packets, access credentials, execute displayed code, or monitor other applications. System readings shown in the dashboard are simulated.
 
-- .NET 10 SDK to build from source
-- Windows 10/11, Linux, or macOS for interactive mode
-- An interactive terminal with VT/ANSI support; redirected output is supported through `--snapshot`
-- .NET 10 SDK only when building from source; planned release archives are self-contained
+## Availability
 
-**Compatibility status:** Windows 10 build 19045 x64 ConPTY has passed the current interactive smoke test. The POSIX terminal adapter and CI matrix are in development; Linux and macOS runtime tests have not yet run, and direct Windows Terminal/Console Host checks remain pending. See [cross-platform terminal architecture](docs/architecture/cross-platform-terminal.md), [interactive validation](docs/implementation/interactive-validation.md), [compatibility](docs/implementation/compatibility.md), and [known defects](docs/implementation/known-defects.md).
+This repository is a development preview. **There are no official downloadable installers or release archives yet.** Until packages appear on the [Releases page](https://github.com/krishna28004/Hollywood-CLI/releases), use the source instructions below. Don’t treat local build artifacts as official releases.
 
-## Build and run
+| Platform | Current status |
+| --- | --- |
+| Windows 10/11 x64 | Interactive app and installer flow exercised on Windows 10 x64, including ConPTY and Git Bash. |
+| Windows ARM64 | Build target is prepared; native ARM64 runtime validation is pending. |
+| Linux x64/ARM64 | Platform adapter and build targets are in development; native terminal validation is pending. |
+| macOS Intel/Apple Silicon | Platform adapter and build targets are in development; native terminal validation is pending. |
+
+Compatibility depends on both the operating system and the terminal emulator. Windows Terminal, classic Console Host, and Linux/macOS terminal emulator coverage will be expanded before those combinations are called fully supported.
+
+## Try Hollywood from source
+
+Running from source currently requires Git and the **.NET 10 SDK**. Get the SDK from [Microsoft’s .NET download page](https://dotnet.microsoft.com/download/dotnet/10.0). These steps are for preview testing; they do not install a global `hollywood` command.
+
+### Windows PowerShell or Windows Terminal
+
+Open PowerShell and run:
 
 ```powershell
-dotnet build Hollywood.sln -c Release
+git clone https://github.com/krishna28004/Hollywood-CLI.git
+Set-Location Hollywood-CLI
 dotnet run --project src/Hollywood.Cli
-dotnet run --project src/Hollywood.Cli -- --help
-dotnet run --project src/Hollywood.Cli -- --version
-dotnet run --project src/Hollywood.Cli -- --snapshot --theme retro --layout focus --seed 12345
-dotnet run --project tests/Hollywood.UnitTests -c Release
-dotnet run --project tests/Hollywood.ConPty -c Release -- artifacts/win-x64/hollywood.exe
 ```
 
-On Linux and macOS, use `dotnet run --project src/Hollywood.Cli` from an interactive terminal while developing. Native self-contained archives are not yet published; CI is being expanded to build and test the six target operating-system/architecture combinations.
+In a new PowerShell window, repeat the final command from the cloned folder to start Hollywood again.
 
-The executable supports five themes (`classic`, `cyberpunk`, `soc`, `matrix`, `retro`), layouts (`auto`, `focus`, `dense`), panel counts (2, 3, 6, 7, 10), speed (`slow`, `normal`, `fast`), frame caps (1–60), reduced motion, deterministic seeds, and keyboard-reactive animation. The default scene uses seven panels with a large code stream, system process table, network graph, packet feed, event log, data stream, and topology. Ordinary keys anonymously raise simulation activity; it cools down smoothly after typing stops. Q/Esc exits, Ctrl+C cancels, Space pauses/resumes, T cycles themes, and L cycles layouts. Use `--keyboard-reactive off` to disable activity response. `--snapshot` writes plain text without terminal control sequences.
+### Windows Git Bash
 
-The visual concept used for this refresh is [shown here](docs/visuals/linux-hollywood-reference-concept.png). It approximates the classic Linux Hollywood multi-pane style. The linked YouTube Short could not be inspected at the requested 20-second point in this environment, so this image is not claimed to reproduce that exact frame.
+Open Git Bash and run:
+
+```bash
+git clone https://github.com/krishna28004/Hollywood-CLI.git
+cd Hollywood-CLI
+winpty dotnet run --project src/Hollywood.Cli
+```
+
+Git Bash’s mintty terminal needs `winpty` for interactive Windows console programs. When an official Windows installer is released, its launcher is intended to make the command available as `hollywood` in a new terminal.
+
+### Linux or macOS
+
+In an interactive terminal, run:
+
+```bash
+git clone https://github.com/krishna28004/Hollywood-CLI.git
+cd Hollywood-CLI
+dotnet run --project src/Hollywood.Cli
+```
+
+Native Linux and macOS runtime behavior has not been verified yet. These are developer-preview instructions, not a claim that every distribution or terminal is supported.
+
+## Controls
+
+| Key | Action |
+| --- | --- |
+| `Q` or `Esc` | Exit |
+| `Ctrl+C` | Cancel and restore the terminal |
+| `Space` | Pause or resume |
+| `T` | Cycle themes |
+| `L` | Cycle layouts |
+| Other keys | Increase simulated activity while pressed; key contents are not stored |
+
+When typing stops, animation gradually returns to a quieter idle state. Use `--keyboard-reactive off` to disable this behavior.
+
+## Themes and options
+
+Hollywood includes Classic, Cyberpunk, SOC, Matrix, and Retro themes. Common options:
+
+```text
+--theme classic|cyberpunk|soc|matrix|retro
+--layout auto|focus|dense
+--panels 2|3|6|7|10
+--speed slow|normal|fast
+--fps 1..60
+--keyboard-reactive on|off
+--reduced-motion
+--seed NUMBER
+--snapshot
+```
+
+Examples:
+
+```powershell
+dotnet run --project src/Hollywood.Cli -- --theme matrix --speed fast
+dotnet run --project src/Hollywood.Cli -- --layout dense --keyboard-reactive off
+dotnet run --project src/Hollywood.Cli -- --snapshot --theme retro --seed 12345
+```
+
+`--snapshot` writes plain text and does not start the interactive display. For the complete option list, run:
+
+```powershell
+dotnet run --project src/Hollywood.Cli -- --help
+```
 
 ## Configuration
 
-The optional JSON file is `%LOCALAPPDATA%\Hollywood\config.json` on Windows, `$XDG_CONFIG_HOME/hollywood/config.json` (or `~/.config/hollywood/config.json`) on Linux, and `~/Library/Application Support/Hollywood/config.json` on macOS. Normal startup reads it if present and never creates or overwrites it. Command-line values override file values; `--no-config` bypasses it and `--config PATH` selects a file.
+Configuration is optional and is never created or overwritten automatically.
 
-```powershell
-hollywood config path
-hollywood config show
-hollywood config validate [PATH]
+- **Windows:** `%LOCALAPPDATA%\Hollywood\config.json`
+- **Linux:** `$XDG_CONFIG_HOME/hollywood/config.json`, or `~/.config/hollywood/config.json`
+- **macOS:** `~/Library/Application Support/Hollywood/config.json`
+
+Inspect or validate configuration with:
+
+```text
+dotnet run --project src/Hollywood.Cli -- config path
+dotnet run --project src/Hollywood.Cli -- config show
+dotnet run --project src/Hollywood.Cli -- config validate
 ```
 
-Schema version 1 supports theme, layout, panel count, speed, frame-rate limit, deterministic seed, color mode, ASCII glyph mode, reduced motion, simulated telemetry mode, enabled modules, and `keyboardReactive` settings (`enabled`, `idleIntensity`, `maximumIntensity`, `sensitivity`, `cooldownSeconds`). CLI overrides take precedence. The parser rejects unknown fields, duplicate keys, unsupported versions, invalid values, files larger than 64 KiB, and excessive JSON nesting. A ready-to-copy example is in [examples/config.json](examples/config.json). Panel rotation and Unicode glyphs are not implemented.
+See [`examples/config.json`](examples/config.json) for themes, layout, speed, enabled modules, reduced motion, and keyboard-reactivity settings.
 
-## Distribution
-
-Self-contained, single-file artifacts are produced per runtime identifier. For example, build the Windows x64 artifact with:
+## Build and verify
 
 ```powershell
-dotnet publish src/Hollywood.Cli/Hollywood.Cli.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true --configfile NuGet.Config -o artifacts/win-x64
+dotnet build Hollywood.sln -c Release
+dotnet tests/Hollywood.UnitTests/bin/Release/net10.0/Hollywood.UnitTests.dll
 ```
 
-Planned release targets are `win-x64`, `win-arm64`, `linux-x64`, `linux-arm64`, `osx-x64`, and `osx-arm64`. Portable ZIP/tar.gz packages and native-runner CI evidence are being prepared. No package manager package or public release is available yet. Linux compatibility is constrained by the build artifact's glibc baseline; macOS archives are not signed or notarized yet. See [installation status and portable workflows](docs/installation.md) for the planned user-owned installation process and command-collision guidance.
+The Windows ConPTY interaction harness can be run against a built Windows executable:
 
-## Safety and current limitations
+```powershell
+dotnet tests/Hollywood.ConPty/bin/Release/net10.0/Hollywood.ConPty.dll path\to\hollywood.exe
+```
 
-All ten visual modules generate synthetic content. Network addresses are documentation examples. System metrics remain simulated. Unicode glyph mode and live telemetry are not implemented. The runtime targets .NET 10. Windows PowerShell 5.1 can launch the published native executable but is not a build/runtime target. Linux/macOS PTY validation and real terminal host checks remain release gates.
+This harness is Windows-only. Unit or ConPTY success does not establish compatibility with every terminal emulator. See [`docs/implementation`](docs/implementation/) for current evidence and pending checks.
 
-## Project status
+## Downloadable releases
 
-This repository is a development preview, not a production release. Verification evidence and remaining gaps are tracked under [`docs/implementation`](docs/implementation/).
+Release packages will be linked from [GitHub Releases](https://github.com/krishna28004/Hollywood-CLI/releases) after platform testing and packaging are complete. The intended Windows flow is to download the matching x64 or ARM64 package, extract it, run `Hollywood-Setup.exe`, open a new terminal, and type `hollywood`. Linux and macOS archives and package-manager instructions will be added only after they are built and validated.
+
+## License
+
+No project license has been declared yet. The public repository is available to view, but no general permission to reuse, modify, or redistribute the project is granted. A license must be added before third parties are told they can use or redistribute Hollywood. See [GitHub’s licensing guidance](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository).
