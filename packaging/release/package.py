@@ -148,7 +148,7 @@ def main():
                     package.add(file, arcname=file.name, recursive=False)
         verify(archive, stage, name, args.rid, args.version)
     digest = sha(archive)
-    archive.with_name(archive.name + ".sha256").write_text(f"{digest}  {archive.name}\n", encoding="ascii")
+    archive.with_name(archive.name + ".sha256").write_bytes(f"{digest}  {archive.name}\n".encode("ascii"))
     print(f"PASS {args.rid} {args.version} {digest}  {archive.name}")
 
 

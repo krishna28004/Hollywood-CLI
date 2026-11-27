@@ -16,6 +16,14 @@ The first candidate version is **0.2.0-beta.1**. The existing application versio
 
 The [baseline automated run](https://github.com/krishna28004/Hollywood-CLI/actions/runs/45993687298) passed all six lanes on commit e056118. The release workflow rebuilds on the candidate commit and checks the exact candidate outputs.
 
+## Defects found during qualification
+
+- macOS represented the same home directory through different path aliases. The installer now checks resolved directory identity and has an alias regression case.
+- macOS BSD utilities rejected GNU-style option separators. The installer now uses portable arguments with absolute filesystem paths.
+- The Windows launcher check had prepended the installation directory. Child shell tests now reconstruct PATH from the machine and user registry values in Windows order.
+- Windows uninstall after an upgrade could leave two generated launchers. Cleanup now checks the full launcher template against the version in the launcher, and the lifecycle verifies that both files are removed.
+- Windows-generated archive checksums used CRLF, so GNU checksum verification treated the trailing carriage return as part of the archive name. Checksum files now use LF on every platform.
+
 ## Running a candidate
 
 The **Release candidate** workflow runs a rehearsal on changes to its workflow file on main. A maintainer can also run it on main from the Actions page with the full commit SHA and beta version. Leave **Create a release draft** unchecked during qualification.

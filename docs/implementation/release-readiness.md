@@ -1,5 +1,7 @@
 # Release readiness audit
 
+Historical audit. See [public release progress](../release/public-release-progress.md) for current package evidence and qualification.
+
 **Audit date:** 2026-11-27
 
 **Decision:** Development preview; not ready for a general-user release.
@@ -16,7 +18,7 @@ There are no GitHub Releases or supported downloadable packages. The Windows ins
 - GitHub Releases API returned an empty release list.
 - Latest public CI run checked: run 19, commit `f9c9662847270a7b90a005d316024ea26d3f1a4a`, dated 2026-11-25.
 - Windows x64 and Windows ARM64 workflow jobs passed, including their configured Windows integration steps.
-- Linux x64, Linux ARM64, macOS Intel, and macOS Apple Silicon builds, shared regression harnesses, snapshots, and self-contained publish steps passed. PTY failures revealed two obsolete assumptions: the expected mixed-case title and treating `q`/Escape as non-exit input, despite both being documented exit keys. The test source now checks the current title, sends neutral activity keys, and verifies Q/Escape exit; a green CI rerun is still required.
+- Linux x64, Linux ARM64, macOS Intel, and macOS Apple Silicon builds, shared regression harnesses, snapshots, and self-contained publish steps passed. The updated title and control expectations passed on [run 21](https://github.com/krishna28004/Hollywood-CLI/actions/runs/45993687298).
 - Local Windows evidence is recorded in [installation progress](installation-progress.md), [compatibility](compatibility.md), and [interactive validation](interactive-validation.md). It covers Windows 10 x64; it does not establish all terminal-host behavior.
 - No root `LICENSE` file exists. Choose and add a license before inviting public use, reuse, or redistribution. Do not guess the owner’s license choice.
 
@@ -26,8 +28,8 @@ There are no GitHub Releases or supported downloadable packages. The Windows ins
 | --- | --- | --- |
 | Developer evaluating source on Windows | Conditional preview | Git, .NET 10 SDK, build/run steps; direct Windows Terminal and classic Console Host checks remain. |
 | Ordinary Windows user | Not ready | No published installer, signing, or official download; currently tested installer is unsigned and local only. |
-| Linux user | Not ready | Corrected PTY CI rerun, terminal-emulator validation, supported distro/libc declaration, and release archive. |
-| macOS user | Not ready | Corrected PTY CI rerun, terminal validation, signed/notarized distribution, and release archive. |
+| Linux user | Not ready | Desktop terminal validation, broader distro qualification, and published release archive. |
+| macOS user | Not ready | Desktop terminal validation, signed/notarized distribution, and published release archive. |
 | Third-party reuse/redistribution | Not authorized by repository license | Add an owner-approved license and review dependency notices. |
 
 ## Release gates
@@ -39,6 +41,6 @@ There are no GitHub Releases or supported downloadable packages. The Windows ins
 5. Linux and macOS PTY checks pass, then representative real terminal sessions and supported OS/architecture combinations are recorded.
 6. Release notes, install/uninstall steps, SHA-256 checksums, provenance, and known limitations are prepared. Publish only after the release owner authorizes it.
 
-## Next action
+## Current work
 
-Push the corrected PTY expectation and documentation, wait for the full GitHub Actions matrix, then fix any real failures before preparing an explicitly versioned release. Do not label the application generally available until the gates above are satisfied.
+See the [release blocker list](../release/release-blockers.md).

@@ -26,8 +26,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: hollywood-release-${{ github.ref }}
-  cancel-in-progress: false
+  group: hollywood-release-${{ github.ref }}-${{ inputs.create_draft || false }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
 
 jobs:
   source:
