@@ -2,7 +2,8 @@
 param(
     [string] $Version = '0.2.0',
     [string] $CompilerPath,
-    [string] $RestoreSource
+    [string] $RestoreSource,
+    [switch] $SetupOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -43,14 +44,9 @@ $noticePath = Join-Path $publishRoot 'THIRD-PARTY-NOTICES.txt'
 $innoLicensePath = Join-Path $publishRoot 'INNO-SETUP-LICENSE.txt'
 $compilerLicense = Join-Path (Split-Path -Parent $compiler) 'LICENSE.TXT'
 $project = Join-Path $repoRoot 'src/Hollywood.Cli/Hollywood.Cli.csproj'
-$noticesCandidates = @(
-    (Join-Path $env:ProgramFiles 'dotnet/ThirdPartyNotices.txt'),
-    (Join-Path $env:ProgramFiles 'dotnet/shared/Microsoft.NETCore.App/10.0.15/ThirdPartyNotices.txt')
-)
-$noticesSource = $noticesCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-if (-not $noticesSource) {
-    throw 'The .NET runtime ThirdPartyNotices.txt file could not be located. Refusing to build a package without runtime notices.'
-}
+$runtimeLicensePath = Join-Path $publishRoot 'DOTNET-LICENSE.txt'
+$projectLicense = Join-Path $repoRoot 'LICENSE'
+$projectNotice = Join-Path $repoRoot 'NOTICE'
 if (-not (Test-Path -LiteralPath $compilerLicense)) {
     throw "The Inno Setup license file was not found next to the compiler: $compilerLicense"
 }
@@ -64,6 +60,8 @@ function Assert-WithinOutputRoot([string] $Path) {
 }
 
 New-Item -ItemType Directory -Force -Path $publishRoot, $releaseRoot | Out-Null
+$runtimeNotices = @()
+$runtimeLicenses = @()
 foreach ($rid in @('win-x64', 'win-arm64')) {
     $ridOutput = Join-Path $publishRoot $rid
     New-Item -ItemType Directory -Force -Path $ridOutput | Out-Null
@@ -81,9 +79,22 @@ foreach ($rid in @('win-x64', 'win-arm64')) {
     if (-not (Test-Path -LiteralPath $executable) -or (Get-Item -LiteralPath $executable).Length -lt 1MB) {
         throw "The self-contained executable for $rid is missing or unexpectedly small."
     }
+    $assets = Get-Content -LiteralPath (Join-Path (Split-Path $project -Parent) 'obj/project.assets.json') -Raw | ConvertFrom-Json
+    $runtime = "Microsoft.NETCore.App.Runtime.$rid"
+    $dependency = $assets.project.frameworks.'net10.0'.downloadDependencies | Where-Object name -eq $runtime
+    if (-not $dependency) { throw "The restore did not declare $runtime." }
+    $runtimeVersion = ($dependency.version.Trim('[', ']') -split ',')[0]
+    $pack = $assets.packageFolders.PSObject.Properties.Name |
+        ForEach-Object { Join-Path $_ "$($runtime.ToLowerInvariant())/$runtimeVersion" } |
+        Where-Object { Test-Path -LiteralPath (Join-Path $_ 'THIRD-PARTY-NOTICES.TXT') } |
+        Select-Object -First 1
+    if (-not $pack) { throw "The restored $runtime runtime pack has no notices." }
+    $runtimeNotices += "$runtime $runtimeVersion", (Get-Content -LiteralPath (Join-Path $pack 'THIRD-PARTY-NOTICES.TXT') -Raw)
+    $runtimeLicenses += "$runtime $runtimeVersion", (Get-Content -LiteralPath (Join-Path $pack 'LICENSE.TXT') -Raw)
 }
 
-Copy-Item -LiteralPath $noticesSource -Destination $noticePath -Force
+$runtimeNotices | Set-Content -LiteralPath $noticePath -Encoding utf8
+$runtimeLicenses | Set-Content -LiteralPath $runtimeLicensePath -Encoding utf8
 Copy-Item -LiteralPath $compilerLicense -Destination $innoLicensePath -Force
 $licenseInfo = @'
 Hollywood CLI source license status
@@ -96,6 +107,9 @@ The application is published self-contained and includes the .NET runtime.
 See THIRD-PARTY-NOTICES.txt for the runtime's bundled third-party notices.
 '@
 $licenseInfoPath = Join-Path $publishRoot 'LICENSE-INFORMATION.txt'
+if (Test-Path -LiteralPath $projectLicense) {
+    $licenseInfo = 'See the accompanying LICENSE file for the Hollywood CLI source license and the .NET and Inno Setup files for third-party terms.'
+}
 [IO.File]::WriteAllText($licenseInfoPath, $licenseInfo, [Text.UTF8Encoding]::new($false))
 
 $versionOutput = & (Join-Path $publishRoot 'win-x64/hollywood.exe') --version
@@ -103,7 +117,7 @@ if ($LASTEXITCODE -ne 0 -or $versionOutput.Trim() -ne "Hollywood CLI $Version") 
     throw "The x64 packaged executable version check failed: '$versionOutput'."
 }
 
-foreach ($rid in @('win-x64', 'win-arm64')) {
+foreach ($rid in $(if (-not $SetupOnly) { 'win-x64', 'win-arm64' })) {
     $zipPath = Join-Path $releaseRoot "hollywood-$rid.zip"
     if (Test-Path -LiteralPath $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
     $stage = Join-Path $stageRoot $rid
@@ -111,13 +125,19 @@ foreach ($rid in @('win-x64', 'win-arm64')) {
     if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force }
     New-Item -ItemType Directory -Force -Path $stage | Out-Null
     Copy-Item -Path (Join-Path $publishRoot "$rid/*") -Destination $stage -Recurse -Force
-    Copy-Item -LiteralPath $noticePath, $licenseInfoPath, $innoLicensePath -Destination $stage -Force
+    Copy-Item -LiteralPath $noticePath, $licenseInfoPath, $runtimeLicensePath -Destination $stage -Force
+    foreach ($file in @($projectLicense, $projectNotice)) {
+        if (Test-Path -LiteralPath $file) { Copy-Item -LiteralPath $file -Destination $stage -Force }
+    }
     Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zipPath -CompressionLevel Optimal
     $hash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
     [IO.File]::WriteAllText("$zipPath.sha256", "$hash  $(Split-Path $zipPath -Leaf)`n", [Text.Encoding]::ASCII)
 }
 
-$compilerOutput = & $compiler "/DAppVersion=$Version" (Join-Path $PSScriptRoot 'hollywood.iss') 2>&1
+$compilerArgs = @("/DAppVersion=$Version")
+if (Test-Path -LiteralPath $projectLicense) { $compilerArgs += '/DIncludeProjectLicense=1' }
+if (Test-Path -LiteralPath $projectNotice) { $compilerArgs += '/DIncludeProjectNotice=1' }
+$compilerOutput = & $compiler @compilerArgs (Join-Path $PSScriptRoot 'hollywood.iss') 2>&1
 $compilerExitCode = $LASTEXITCODE
 $compilerOutput | ForEach-Object { Write-Host $_ }
 if ($compilerExitCode -ne 0) { throw "Inno Setup compilation failed (exit $compilerExitCode)." }
@@ -126,11 +146,14 @@ $setupPath = Join-Path $releaseRoot 'Hollywood-Setup.exe'
 if (-not (Test-Path -LiteralPath $setupPath)) { throw 'Inno Setup did not create Hollywood-Setup.exe.' }
 $signature = Get-AuthenticodeSignature -FilePath $setupPath
 $setupHash = (Get-FileHash -LiteralPath $setupPath -Algorithm SHA256).Hash.ToLowerInvariant()
+$sourceCommit = & git -C $repoRoot rev-parse HEAD
+if ($LASTEXITCODE -ne 0) { throw 'Could not identify the installer source commit.' }
 $compilerVersionLine = $compilerOutput | Where-Object { $_ -match '^Compiler engine version:' } | Select-Object -First 1
 $compilerVersion = if ($compilerVersionLine) { ($compilerVersionLine -replace '^Compiler engine version:\s*', '').Trim() } else { 'Unknown (version not reported by compiler)' }
 $metadata = [ordered]@{
     product = 'Hollywood CLI'
     version = $Version
+    sourceCommit = $sourceCommit
     installerFramework = 'Inno Setup'
     installerFrameworkVersion = $compilerVersion
     architectures = @('win-x64', 'win-arm64')

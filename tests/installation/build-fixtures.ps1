@@ -26,6 +26,7 @@ foreach ($rid in @('win-x64', 'win-arm64')) {
 }
 New-Item -ItemType Directory -Force -Path $fixtureRoot, $failurePayload | Out-Null
 Copy-Item -LiteralPath (Join-Path $payload 'THIRD-PARTY-NOTICES.txt'),
+    (Join-Path $payload 'DOTNET-LICENSE.txt'),
     (Join-Path $payload 'LICENSE-INFORMATION.txt'),
     (Join-Path $payload 'INNO-SETUP-LICENSE.txt') -Destination $failurePayload -Force
 New-Item -ItemType Directory -Force -Path (Join-Path $failurePayload 'win-x64'),

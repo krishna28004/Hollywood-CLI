@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using Hollywood.Cli.Configuration;
 using Hollywood.Cli.Terminal;
@@ -11,7 +12,8 @@ namespace Hollywood.Cli;
 
 internal static class Program
 {
-    private const string Version = "0.2.0";
+    private static readonly string Version = typeof(Program).Assembly
+        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
     private sealed record Options(
         bool Help, bool ShowVersion, bool Snapshot, bool ReducedMotion,
         int Theme, int Panels, uint Seed, int FrameRate, string Speed, string ColorMode,

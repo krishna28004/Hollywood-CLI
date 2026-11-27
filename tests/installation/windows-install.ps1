@@ -1,5 +1,6 @@
 [CmdletBinding()]
 param(
+    [string] $Version = '0.2.0',
     [Parameter(Mandatory = $true)] [string] $SetupPath,
     [string] $UpgradeSetupPath,
     [string] $FailingSetupPath,
@@ -109,7 +110,7 @@ function Get-InstalledCommandName {
     return [string]$state.HollywoodCommand
 }
 
-function Assert-CommandWorks([string] $CommandName, [string] $TargetDir, [string] $ExpectedVersion = '0.2.0') {
+function Assert-CommandWorks([string] $CommandName, [string] $TargetDir, [string] $ExpectedVersion = $Version) {
     # Put the install under test first so an older installed copy cannot mask a broken launcher.
     $pathValue = $TargetDir + ';' + (Get-EffectivePath)
     $expected = "Hollywood CLI $ExpectedVersion"
@@ -185,7 +186,7 @@ function Run-InstallLifecycle([string] $TargetDir, [string] $ProcessPath, [strin
             $upgrade = (Resolve-Path -LiteralPath $UpgradeInstaller).Path
             $exit = Start-Setup $upgrade $target $log $ProcessPath
             Assert ($exit -eq 0) "Upgrade failed with exit code $exit. See $log"
-            Assert-CommandWorks $command $target '0.2.0'
+            Assert-CommandWorks $command $target
             Assert (Test-Path -LiteralPath (Join-Path $target 'versions/0.2.1/win-x64/hollywood.exe')) 'Upgrade did not install the new versioned payload.'
         }
 
@@ -195,7 +196,7 @@ function Run-InstallLifecycle([string] $TargetDir, [string] $ProcessPath, [strin
             Assert ($failureExit -eq 4) "Failed setup did not return the installer error code 4 (received $failureExit)."
             Assert (-not (Test-Path -LiteralPath (Join-Path $target 'versions/0.2.2/win-x64/hollywood.exe'))) 'The deliberately invalid payload was left installed.'
             Assert ((Get-Content -LiteralPath $log -Raw) -match 'Hollywood CLI installation failed: The installed executable failed validation') 'The failed setup did not report the payload verification error.'
-            Assert-CommandWorks $command $target '0.2.0'
+            Assert-CommandWorks $command $target
             if ($UpgradeInstaller) {
                 $launcher = Get-Content -LiteralPath (Join-Path $target "$command.cmd") -Raw
                 Assert ($launcher.Contains('versions\0.2.1\')) 'Failed upgrade did not preserve the prior working launcher.'

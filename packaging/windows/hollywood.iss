@@ -37,8 +37,15 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Source: "{#PayloadRoot}\win-x64\hollywood.exe"; DestDir: "{app}\versions\{#AppVersion}\win-x64"; Flags: ignoreversion; Check: not IsArm64
 Source: "{#PayloadRoot}\win-arm64\hollywood.exe"; DestDir: "{app}\versions\{#AppVersion}\win-arm64"; Flags: ignoreversion; Check: IsArm64
 Source: "{#PayloadRoot}\THIRD-PARTY-NOTICES.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#PayloadRoot}\DOTNET-LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PayloadRoot}\LICENSE-INFORMATION.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PayloadRoot}\INNO-SETUP-LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion
+#ifdef IncludeProjectLicense
+Source: "..\..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+#endif
+#ifdef IncludeProjectNotice
+Source: "..\..\NOTICE"; DestDir: "{app}"; Flags: ignoreversion
+#endif
 
 [Run]
 Filename: "{app}\versions\{#AppVersion}\{code:RuntimeFolder}\hollywood.exe"; Description: "Launch Hollywood now"; Flags: postinstall nowait skipifsilent; Check: CanLaunchHollywood

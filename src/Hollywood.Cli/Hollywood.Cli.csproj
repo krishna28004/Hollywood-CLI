@@ -3,6 +3,8 @@
     <OutputType>Exe</OutputType>
     <AssemblyName>hollywood</AssemblyName>
     <RootNamespace>Hollywood.Cli</RootNamespace>
+    <Version>0.2.0</Version>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Hollywood.Engine\Hollywood.Engine.csproj" />
