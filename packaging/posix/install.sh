@@ -22,6 +22,31 @@ owns_link() {
     [ -L "$1" ] && [ "$(readlink "$1")" = "$binary" ]
 }
 
+path_has_dir() {
+    wanted=$1
+    remaining=$PATH:
+    while [ -n "$remaining" ]; do
+        entry=${remaining%%:*}
+        remaining=${remaining#*:}
+        case $entry in
+            "$wanted"|"$HOME/${wanted#"$home"/}") return 0 ;;
+            /*)
+                if [ -d "$entry" ] && [ "$(CDPATH='' cd -P -- "$entry" && pwd -P)" = "$wanted" ]; then
+                    return 0
+                fi ;;
+        esac
+    done
+    return 1
+}
+
+resolves_to_bin() {
+    case $1 in
+        /*/"$2")
+            [ "$(CDPATH='' cd -P -- "$(dirname -- "$1")" && pwd -P)" = "$bin_dir" ] ;;
+        *) return 1 ;;
+    esac
+}
+
 owns_install() {
     [ -d "$app" ] && [ ! -L "$app" ] && [ -f "$marker" ] &&
         [ ! -L "$marker" ] && [ "$(cat "$marker")" = 'Hollywood CLI installer v1' ]
@@ -87,24 +112,23 @@ if [ -e "$app" ] || [ -L "$app" ]; then
         fail 'The recorded command directory has moved.'
 else
     for candidate in "$home/.local/bin" "$home/bin"; do
-        case ":$PATH:" in
-            *":$candidate:"*)
-                mkdir -p -- "$candidate"
-                [ "$(CDPATH='' cd -P -- "$candidate" && pwd -P)" = "$candidate" ] && [ -w "$candidate" ] ||
-                    fail "Command directory is not a writable directory at $candidate."
-                bin_dir=$candidate
-                break ;;
-        esac
+        if path_has_dir "$candidate"; then
+            mkdir -p -- "$candidate"
+            [ "$(CDPATH='' cd -P -- "$candidate" && pwd -P)" = "$candidate" ] && [ -w "$candidate" ] ||
+                fail "Command directory is not a writable directory at $candidate."
+            bin_dir=$candidate
+            break
+        fi
     done
 fi
 [ -n "$bin_dir" ] || fail 'No supported user command directory is on PATH. See the install guide for setup, or run ./hollywood from the extracted archive.'
-case ":$PATH:" in *":$bin_dir:"*) ;; *) fail "Open a shell with $bin_dir on PATH before reinstalling." ;; esac
+path_has_dir "$bin_dir" || fail "Open a shell with $bin_dir on PATH before reinstalling."
 
 command_name=
 for name in hollywood hollywood-cli; do
     if owns_link "$bin_dir/$name" || { [ ! -e "$bin_dir/$name" ] && [ ! -L "$bin_dir/$name" ]; }; then
         found=$(command -v "$name" || :)
-        if [ -z "$found" ] || [ "$found" = "$bin_dir/$name" ]; then
+        if [ -z "$found" ] || resolves_to_bin "$found" "$name"; then
             command_name=$name
             break
         fi

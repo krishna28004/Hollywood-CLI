@@ -77,4 +77,12 @@ with tempfile.TemporaryDirectory(prefix="Hollywood install Ω ") as temp:
     assert not (bin_dir / "hollywood-cli").is_symlink()
     assert config.read_text(encoding="utf-8") == '{"sentinel":true}\n'
 
+    # A shell may refer to the home directory through a path alias.
+    alias = root / "home alias"
+    alias.symlink_to(home, target_is_directory=True)
+    alias_env = dict(env, HOME=str(alias), PATH=f"{alias}/.local/bin:{tools}")
+    run(installer, environment=alias_env)
+    assert run("/bin/sh", "-c", "hollywood-cli --version", environment=alias_env).strip() == f"Hollywood CLI {version}"
+    run(installer, "--uninstall", environment=alias_env)
+
 print("PASS: packaged POSIX install, fresh shells, repair, failed replacement, PTY, collision, and uninstall")

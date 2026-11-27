@@ -49,6 +49,8 @@ jobs:
       HOLLYWOOD_VERSION: ${{ inputs.version || '0.2.0' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-dotnet@v4
         with:
