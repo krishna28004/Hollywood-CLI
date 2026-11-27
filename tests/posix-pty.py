@@ -112,12 +112,12 @@ def main():
 
     session = Session(executable)
     try:
-        session.wait_for("Ubuntu 24.04")
+        session.wait_for("UBUNTU 24.04")
         terminal_attributes = termios.tcgetattr(session.master)
         if terminal_attributes[3] & (termios.ICANON | termios.ECHO):
             raise AssertionError("interactive adapter did not enable noncanonical, no-echo input")
         session.read_for(0.3)
-        if b"Hollywood demo" not in session.output:
+        if b"HOLLYWOOD SIM" not in visible_text(session.output):
             raise AssertionError("scene header was not captured")
 
         before_keys = len(session.output)
@@ -142,7 +142,7 @@ def main():
 
     escape = Session(executable)
     try:
-        escape.wait_for("Ubuntu 24.04")
+        escape.wait_for("UBUNTU 24.04")
         escape.send(b"\x1b")
         escape.read_for(0.5)
         if escape.exit_code() is not None:
@@ -155,7 +155,7 @@ def main():
 
     interrupt = Session(executable)
     try:
-        interrupt.wait_for("Ubuntu 24.04")
+        interrupt.wait_for("UBUNTU 24.04")
         interrupt.send(b"\x03")
         if interrupt.wait_exit() != 130:
             raise AssertionError("Ctrl+C did not exit with status 130")
@@ -166,7 +166,7 @@ def main():
 
     terminate = Session(executable)
     try:
-        terminate.wait_for("Ubuntu 24.04")
+        terminate.wait_for("UBUNTU 24.04")
         os.kill(terminate.pid, signal.SIGTERM)
         if terminate.wait_exit() != 143:
             raise AssertionError("SIGTERM did not exit with status 143")

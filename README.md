@@ -8,18 +8,20 @@ Hollywood CLI turns an interactive terminal into a fictional, animated operation
 
 This repository is a development preview. **There are no official downloadable installers or release archives yet.** Until packages appear on the [Releases page](https://github.com/krishna28004/Hollywood-CLI/releases), use the source instructions below. Don’t treat local build artifacts as official releases.
 
+![Hollywood CLI operations dashboard preview](docs/design/hollywood-master-120x30.png)
+
 | Platform | Current status |
 | --- | --- |
-| Windows 10/11 x64 | Interactive app and installer flow exercised on Windows 10 x64, including ConPTY and Git Bash. |
-| Windows ARM64 | Build target is prepared; native ARM64 runtime validation is pending. |
-| Linux x64/ARM64 | Platform adapter and build targets are in development; native terminal validation is pending. |
-| macOS Intel/Apple Silicon | Platform adapter and build targets are in development; native terminal validation is pending. |
+| Windows x64 | Local Windows 10 x64 build, ConPTY, per-user installer lifecycle, PowerShell/CMD lookup, and Git Bash command lookup exercised. Direct Windows Terminal and classic Console Host coverage remains pending. |
+| Windows ARM64 | CI build and ConPTY job passed; validation in a normal user terminal on ARM64 remains pending. |
+| Linux x64/ARM64 | CI build, snapshot, and publish steps passed on the latest run; the PTY check failed because it expected an obsolete screen header. That test expectation is corrected in the current source and needs a green CI rerun. |
+| macOS Intel/Apple Silicon | CI build, snapshot, and publish steps passed on the latest run; the PTY check failed because it expected an obsolete screen header. That test expectation is corrected in the current source and needs a green CI rerun. |
 
 Compatibility depends on both the operating system and the terminal emulator. Windows Terminal, classic Console Host, and Linux/macOS terminal emulator coverage will be expanded before those combinations are called fully supported.
 
-## Try Hollywood from source
+## Try Hollywood from source (developer preview)
 
-Running from source currently requires Git and the **.NET 10 SDK**. Get the SDK from [Microsoft’s .NET download page](https://dotnet.microsoft.com/download/dotnet/10.0). These steps are for preview testing; they do not install a global `hollywood` command.
+There is not yet a one-click public installer. Running from source requires Git and the **.NET 10 SDK**. Get the SDK from [Microsoft’s .NET download page](https://dotnet.microsoft.com/download/dotnet/10.0). These commands build/run the app from its checkout; they do not install a global `hollywood` command. If you only want to run the app, wait for an official release package on the [Releases page](https://github.com/krishna28004/Hollywood-CLI/releases).
 
 ### Windows PowerShell or Windows Terminal
 
@@ -135,7 +137,7 @@ This harness is Windows-only. Unit or ConPTY success does not establish compatib
 
 ## Downloadable releases
 
-Release packages will be linked from [GitHub Releases](https://github.com/krishna28004/Hollywood-CLI/releases) after platform testing and packaging are complete. The intended Windows flow is to download the matching x64 or ARM64 package, extract it, run `Hollywood-Setup.exe`, open a new terminal, and type `hollywood`. Linux and macOS archives and package-manager instructions will be added only after they are built and validated.
+There are currently **no downloadable release assets** on the [GitHub Releases page](https://github.com/krishna28004/Hollywood-CLI/releases). CI packages are build artifacts, not published releases, and may expire. Once qualified, the intended Windows flow is to download the matching x64 or ARM64 setup, install it per-user, open a new terminal, and type `hollywood`. Linux and macOS archives and package-manager instructions will be added only after their PTY checks pass and platform limitations are documented.
 
 ## License
 

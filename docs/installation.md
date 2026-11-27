@@ -2,7 +2,7 @@
 
 ## Current availability
 
-There is no public release or package-manager listing yet. The Windows setup and archives built from this checkout are local validation artifacts, not signed public downloads. The repository has no `LICENSE` file; do not redistribute artifacts until the project owner chooses and adds a license.
+There is no public release or package-manager listing yet. The Windows setup and archives built from this checkout are local validation artifacts, not signed public downloads. The repository has no `LICENSE` file; do not redistribute artifacts until the project owner chooses and adds a license. CI artifacts are temporary engineering outputs, not supported public downloads.
 
 ## Windows 10/11 setup (local build)
 
@@ -25,11 +25,11 @@ Extract a matching archive into a user-owned folder and run `hollywood.exe`. Por
 
 ## Linux
 
-No `.deb` or `.rpm` package is currently produced. The cross-platform CI builds portable glibc-targeted archives for x64 and ARM64. Extract the matching verified archive into a user-owned directory and run `./hollywood`. To add a command, place a symlink named `hollywood-cli` in a user-owned PATH directory such as `~/.local/bin`; the original Linux Hollywood project may own `/usr/bin/hollywood`, which must not be overwritten. Linux distribution and glibc compatibility still require qualification on each claimed target.
+No `.deb` or `.rpm` package is currently produced. CI is configured to build portable archives for x64 and ARM64, but the latest Linux PTY checks failed on a stale expected screen title, so those archives are not yet qualified for users. After the PTY lanes pass, extract the matching release archive into a user-owned directory and run `./hollywood`. To add a command, place a symlink named `hollywood-cli` in a user-owned PATH directory such as `~/.local/bin`; the original Linux Hollywood project may own `/usr/bin/hollywood`, which must not be overwritten. Linux distribution and glibc compatibility still require qualification on each claimed target.
 
 ## macOS
 
-No `.pkg`, Homebrew formula, signed, or notarized macOS release is currently available. CI targets Intel and Apple Silicon portable archives. A downloaded unsigned build is a development artifact and may be blocked or warned on by Gatekeeper. Do not disable Gatekeeper to run it. A frictionless release requires Developer ID signing, notarization, staple verification, and clean-machine testing.
+No `.pkg`, Homebrew formula, signed, or notarized macOS release is currently available. CI is configured to target Intel and Apple Silicon portable archives, but the latest macOS PTY checks failed on a stale expected screen title, so those builds are not yet qualified for users. A downloaded unsigned build is a development artifact and may be blocked or warned on by Gatekeeper. Do not disable Gatekeeper to run it. A frictionless release requires Developer ID signing, notarization, staple verification, and clean-machine testing.
 
 ## Configuration
 
