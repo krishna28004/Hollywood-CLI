@@ -14,8 +14,8 @@ This repository is a development preview. **There are no official downloadable i
 | --- | --- |
 | Windows x64 | Local Windows 10 x64 build, ConPTY, per-user installer lifecycle, PowerShell/CMD lookup, and Git Bash command lookup exercised. Direct Windows Terminal and classic Console Host coverage remains pending. |
 | Windows ARM64 | CI build and ConPTY job passed; validation in a normal user terminal on ARM64 remains pending. |
-| Linux x64/ARM64 | CI build, snapshot, and publish steps passed on the latest run; the PTY check failed because it expected an obsolete screen header. That test expectation is corrected in the current source and needs a green CI rerun. |
-| macOS Intel/Apple Silicon | CI build, snapshot, and publish steps passed on the latest run; the PTY check failed because it expected an obsolete screen header. That test expectation is corrected in the current source and needs a green CI rerun. |
+| Linux x64/ARM64 | CI build, snapshot, and publish steps passed; PTY checks exposed stale screen-title and exit-key expectations. Both are corrected in the current source and need a green CI rerun. |
+| macOS Intel/Apple Silicon | CI build, snapshot, and publish steps passed; PTY checks exposed stale screen-title and exit-key expectations. Both are corrected in the current source and need a green CI rerun. |
 
 Compatibility depends on both the operating system and the terminal emulator. Windows Terminal, classic Console Host, and Linux/macOS terminal emulator coverage will be expanded before those combinations are called fully supported.
 

@@ -121,10 +121,10 @@ def main():
             raise AssertionError("scene header was not captured")
 
         before_keys = len(session.output)
-        session.send(b"qtlxyz \x1b")
+        session.send(b"xyz")
         session.read_for(0.8)
         if session.exit_code() is not None:
-            raise AssertionError("an ordinary key exited the simulation; only Ctrl+C should stop it")
+            raise AssertionError("ordinary activity keys exited the simulation")
         if len(session.output) <= before_keys:
             raise AssertionError("animation stopped after ordinary keys were pressed")
 
@@ -140,18 +140,17 @@ def main():
     finally:
         session.close()
 
-    escape = Session(executable)
-    try:
-        escape.wait_for("UBUNTU 24.04")
-        escape.send(b"\x1b")
-        escape.read_for(0.5)
-        if escape.exit_code() is not None:
-            raise AssertionError("Escape should be ignored; Ctrl+C is the only keyboard exit")
-        escape.send(b"\x03")
-        if escape.wait_exit() != 130:
-            raise AssertionError("Ctrl+C did not exit after Escape was ignored")
-    finally:
-        escape.close()
+    for exit_key in (b"q", b"\x1b"):
+        exit_session = Session(executable)
+        try:
+            exit_session.wait_for("UBUNTU 24.04")
+            exit_session.send(exit_key)
+            if exit_session.wait_exit() != 0:
+                raise AssertionError("Q/Escape did not exit cleanly")
+            if b"\x1b[?25h" not in exit_session.output:
+                raise AssertionError("Q/Escape did not restore cursor visibility")
+        finally:
+            exit_session.close()
 
     interrupt = Session(executable)
     try:
@@ -175,7 +174,7 @@ def main():
     finally:
         terminate.close()
 
-    print("PASS: POSIX PTY scene, animation, ignored ordinary keys, resize, Ctrl+C/SIGTERM, cursor restoration")
+    print("PASS: POSIX PTY scene, activity keys, Q/Escape, resize, Ctrl+C/SIGTERM, cursor restoration")
     return 0
 
 
