@@ -1,0 +1,154 @@
+name: Release candidate
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/release.yml']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Beta version without the v prefix
+        required: true
+        default: '0.2.0-beta.1'
+      expected_sha:
+        description: Full source commit SHA
+        required: true
+      create_draft:
+        description: Create a release draft after protected approval
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hollywood-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  source:
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.validate.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Check source, version, and release intent
+        id: validate
+        env:
+          VERSION: ${{ inputs.version || '0.2.0-beta.1' }}
+          EXPECTED_SHA: ${{ inputs.expected_sha || github.sha }}
+          CREATE_DRAFT: ${{ inputs.create_draft || false }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == refs/heads/main ]]
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-beta\.[1-9][0-9]*$ ]]
+          [[ "$EXPECTED_SHA" == "$GITHUB_SHA" && "$(git rev-parse HEAD)" == "$EXPECTED_SHA" ]]
+          base="$(dotnet msbuild src/Hollywood.Cli -getProperty:Version)"
+          [[ "$VERSION" == "$base"-beta.* ]]
+          test -z "$(git status --porcelain)"
+          if [[ "$CREATE_DRAFT" == true ]]; then
+            test -s LICENSE
+            if git show-ref --verify --quiet "refs/tags/v$VERSION"; then
+              echo "Release tag already exists"; exit 1
+            fi
+          fi
+          printf 'version=%s\n' "$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Audit tracked history and restore dependencies
+        run: |
+          python3 packaging/release/audit.py
+          dotnet restore Hollywood.sln -p:NuGetAuditMode=all '-warnaserror:NU1900;NU1901;NU1902;NU1903;NU1904'
+
+  qualify:
+    needs: source
+    uses: ./.github/workflows/ci.yml
+    with:
+      version: ${{ needs.source.outputs.version }}
+
+  verify:
+    needs: [source, qualify]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: hollywood-*
+          path: candidates
+      - name: Verify candidate names and checksums
+        working-directory: candidates
+        run: |
+          set -euo pipefail
+          assets=(
+            hollywood-win-x64/hollywood-win-x64.zip
+            hollywood-win-arm64/hollywood-win-arm64.zip
+            hollywood-linux-x64/hollywood-linux-x64.tar.gz
+            hollywood-linux-arm64/hollywood-linux-arm64.tar.gz
+            hollywood-osx-x64/hollywood-osx-x64.tar.gz
+            hollywood-osx-arm64/hollywood-osx-arm64.tar.gz
+            hollywood-windows-setup-validation/Hollywood-Setup.exe
+          )
+          for asset in "${assets[@]}"; do
+            (cd "$(dirname "$asset")"; sha256sum --strict --check "$(basename "$asset").sha256")
+          done
+
+  draft:
+    if: github.event_name == 'workflow_dispatch' && inputs.create_draft
+    needs: [source, qualify, verify]
+    runs-on: ubuntu-22.04
+    # Require reviewers and restrict deployments to main in repository settings.
+    environment: release-draft
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.source.outputs.version }}
+      APPROVED_SHA: ${{ vars.APPROVED_RELEASE_SHA }}
+      APPROVED_LICENSE_SHA: ${{ vars.APPROVED_LICENSE_SHA256 }}
+      QUALIFIED_ASSETS: ${{ vars.QUALIFIED_PREVIEW_ASSETS }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: hollywood-*
+          path: candidates
+      - name: Assemble explicitly qualified preview assets
+        run: |
+          set -euo pipefail
+          [[ "$APPROVED_SHA" == "$GITHUB_SHA" ]]
+          [[ "$(sha256sum LICENSE | cut -d' ' -f1)" == "$APPROVED_LICENSE_SHA" ]]
+          mkdir release-assets
+          set -f
+          for name in $QUALIFIED_ASSETS; do
+            case "$name" in
+              hollywood-win-x64.zip) source=candidates/hollywood-win-x64 ;;
+              hollywood-win-arm64.zip) source=candidates/hollywood-win-arm64 ;;
+              hollywood-linux-x64.tar.gz) source=candidates/hollywood-linux-x64 ;;
+              hollywood-linux-arm64.tar.gz) source=candidates/hollywood-linux-arm64 ;;
+              Hollywood-Setup-x64-arm64.exe)
+                source=candidates/hollywood-windows-setup-validation
+                (cd "$source"; sha256sum --strict --check Hollywood-Setup.exe.sha256)
+                cp "$source/Hollywood-Setup.exe" "release-assets/$name"
+                continue ;;
+              *) echo "Unexpected or unqualified beta asset"; exit 1 ;;
+            esac
+            (cd "$source"; sha256sum --strict --check "$name.sha256")
+            cp "$source/$name" release-assets/
+          done
+          set +f
+          find release-assets -type f -print -quit | grep -q .
+          (cd release-assets; sha256sum * > SHA256SUMS.txt)
+      - name: Create prerelease draft for the tested commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          printf 'Hollywood CLI %s preview.\n\nSource commit: %s\n\nUse the installation guide and verify SHA256SUMS.txt before installing. Windows files are unsigned preview builds. Assets listed here are the only qualified downloads. macOS signing and notarization are pending.\n' "$VERSION" "$GITHUB_SHA" > "$RUNNER_TEMP/release-notes.md"
+          gh release create "v$VERSION" --draft --prerelease \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "Hollywood CLI $VERSION" --notes-file "$RUNNER_TEMP/release-notes.md" \
+            release-assets/*

@@ -1,40 +1,29 @@
 # Installation
 
-## Current availability
+## Availability
 
-There is no public release or package-manager listing yet. The Windows setup and archives built from this checkout are local validation artifacts, not signed public downloads. The repository has no `LICENSE` file; do not redistribute artifacts until the project owner chooses and adds a license. CI artifacts are temporary engineering outputs, not supported public downloads.
+Hollywood CLI has no public release or package-manager listing yet. This guide covers release candidate testing. Use an artifact from a run you trust and compare its SHA-256 with the corresponding manifest before extracting or running it. Local and CI Windows builds are unsigned. macOS CI artifacts are development builds pending signing and notarization.
 
-## Windows 10/11 setup (local build)
+## Windows setup
 
-The developer build script creates a self-contained per-user installer and portable archives for x64 and ARM64:
+1. Open the verified `Hollywood-Setup.exe` candidate. The same setup contains x64 and ARM64 payloads and selects the appropriate one.
+2. Keep the default per-user location or choose a directory you own. Setup registers the command and keeps settings on upgrade.
+3. Open a new PowerShell, CMD, or Git Bash window and type `hollywood`. Setup displays `hollywood-cli` if it detects a collision.
 
-```powershell
-./packaging/windows/build-installer.ps1
-```
+To repair or upgrade, run the new setup. To remove it, use **Settings → Apps → Installed apps**. Hollywood settings are preserved.
 
-The setup output is `artifacts/installer/releases/windows/Hollywood-Setup.exe`. To install, extract the downloaded release archive, double-click `Hollywood-Setup.exe`, accept the per-user destination, then open a new PowerShell or Command Prompt and run `hollywood`. If that command is already provided by another application, setup selects `hollywood-cli` and explains the choice. Setup does not require administrator privileges or change execution policy. The uninstaller removes the command-path entry it owns and preserves `%LOCALAPPDATA%\Hollywood` configuration.
+For portable use, extract the matching `hollywood-win-x64.zip` or `hollywood-win-arm64.zip` and run `./hollywood.exe` in PowerShell from that folder. For development setup builds, run `./packaging/windows/build-installer.ps1` from the repository. Its output is in `artifacts/installer/releases/windows/`.
 
-The local installer is unsigned and may trigger Windows reputation warnings. Do not bypass security warnings for artifacts from an unverified source. Release signing credentials and a declared project license are required before public distribution.
+## Linux and macOS archives
 
-The portable archives are:
+1. Download the candidate for your OS and CPU and verify its checksum against the manifest. On macOS, use the development archive only in a test environment authorized to evaluate it.
+2. Extract the archive. Open a terminal in the extracted directory and run `./install.sh`.
+3. Open a new terminal and type `hollywood`, or `hollywood-cli` if the installer reported a collision.
 
-- `hollywood-win-x64.zip`
-- `hollywood-win-arm64.zip`
+The installer needs `~/.local/bin` or `~/bin` already on your shell’s PATH. If neither is present, you can run `./hollywood` from the extracted directory immediately. For a persistent command, enable `~/.local/bin` using your shell or distribution’s user PATH setup, open a new login shell, and retry. The installer does not change shell startup files. Rerun the installer from a newer archive to upgrade. To uninstall, run `~/.local/share/hollywood-cli/uninstall.sh --uninstall`.
 
-Extract a matching archive into a user-owned folder and run `hollywood.exe`. Portable archives do not edit PATH or registry state.
-
-## Linux
-
-No `.deb` or `.rpm` package is currently produced. CI is configured to build portable archives for x64 and ARM64, but the latest Linux PTY checks exposed stale title and exit-key assumptions, so those archives are not yet qualified for users. The current test source corrects these assumptions and needs a green rerun. After the PTY lanes pass, extract the matching release archive into a user-owned directory and run `./hollywood`. To add a command, place a symlink named `hollywood-cli` in a user-owned PATH directory such as `~/.local/bin`; the original Linux Hollywood project may own `/usr/bin/hollywood`, which must not be overwritten. Linux distribution and glibc compatibility still require qualification on each claimed target.
-
-## macOS
-
-No `.pkg`, Homebrew formula, signed, or notarized macOS release is currently available. CI is configured to target Intel and Apple Silicon portable archives, but the latest macOS PTY checks exposed stale title and exit-key assumptions, so those builds are not yet qualified for users. The current test source corrects these assumptions and needs a green rerun. A downloaded unsigned build is a development artifact and may be blocked or warned on by Gatekeeper. Do not disable Gatekeeper to run it. A frictionless release requires Developer ID signing, notarization, staple verification, and clean-machine testing.
+The Linux runtime targets glibc. CI exercises Ubuntu 22.04 x64 and ARM64 and does not qualify older glibc versions, Alpine, or other distributions. macOS candidates target Intel and Apple Silicon separately. Signed and notarized macOS downloads and real Gatekeeper tests are still pending.
 
 ## Configuration
 
-Configuration uses one versioned JSON schema. Windows stores it under `%LOCALAPPDATA%\Hollywood`; Linux uses `$XDG_CONFIG_HOME/hollywood` or `~/.config/hollywood`; macOS uses the documented Application Support location. Uninstallers must preserve user configuration.
-
-## Package managers
-
-No WinGet package ID, Homebrew formula, or Linux package repository has been published. Names and install commands will be added only after the corresponding package is actually published and verified.
+Uninstallers preserve settings. Run `hollywood config path` for the active path. The defaults are `%LOCALAPPDATA%\Hollywood\config.json` (Windows), `$XDG_CONFIG_HOME/hollywood/config.json` or `~/.config/hollywood/config.json` (Linux), and `~/Library/Application Support/Hollywood/config.json` (macOS).
