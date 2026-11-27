@@ -9,6 +9,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 Set-Location $repoRoot
+$sourceCommit = & git -C $repoRoot rev-parse HEAD
+if ($LASTEXITCODE -ne 0) { throw 'Could not identify the installer source commit.' }
 
 if (-not $CompilerPath) {
     $candidates = @(
@@ -146,8 +148,6 @@ $setupPath = Join-Path $releaseRoot 'Hollywood-Setup.exe'
 if (-not (Test-Path -LiteralPath $setupPath)) { throw 'Inno Setup did not create Hollywood-Setup.exe.' }
 $signature = Get-AuthenticodeSignature -FilePath $setupPath
 $setupHash = (Get-FileHash -LiteralPath $setupPath -Algorithm SHA256).Hash.ToLowerInvariant()
-$sourceCommit = & git -C $repoRoot rev-parse HEAD
-if ($LASTEXITCODE -ne 0) { throw 'Could not identify the installer source commit.' }
 $compilerVersionLine = $compilerOutput | Where-Object { $_ -match '^Compiler engine version:' } | Select-Object -First 1
 $compilerVersion = if ($compilerVersionLine) { ($compilerVersionLine -replace '^Compiler engine version:\s*', '').Trim() } else { 'Unknown (version not reported by compiler)' }
 $metadata = [ordered]@{

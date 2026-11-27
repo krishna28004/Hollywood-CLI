@@ -84,6 +84,8 @@ jobs:
           path: candidates
       - name: Verify candidate names and checksums
         working-directory: candidates
+        env:
+          HOLLYWOOD_VERSION: ${{ needs.source.outputs.version }}
         run: |
           set -euo pipefail
           assets=(
@@ -98,6 +100,30 @@ jobs:
           for asset in "${assets[@]}"; do
             (cd "$(dirname "$asset")"; sha256sum --strict --check "$(basename "$asset").sha256")
           done
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import tarfile
+          import zipfile
+
+          version = os.environ["HOLLYWOOD_VERSION"]
+          commit = os.environ["GITHUB_SHA"]
+          for rid in ("win-x64", "win-arm64", "linux-x64", "linux-arm64", "osx-x64", "osx-arm64"):
+              name = f"hollywood-{rid}"
+              directory = Path(name)
+              if rid.startswith("win-"):
+                  with zipfile.ZipFile(directory / f"{name}.zip") as package:
+                      metadata = json.loads(package.read("artifact-metadata.json"))
+              else:
+                  with tarfile.open(directory / f"{name}.tar.gz") as package:
+                      metadata = json.load(package.extractfile("artifact-metadata.json"))
+              if (metadata["version"], metadata["commit"], metadata["runtimeIdentifier"]) != (version, commit, rid):
+                  raise SystemExit(f"Incorrect candidate metadata: {name}")
+          setup = json.loads(Path("hollywood-windows-setup-validation/artifact-metadata.json").read_text(encoding="utf-8-sig"))
+          if (setup["version"], setup["sourceCommit"]) != (version, commit):
+              raise SystemExit("Incorrect Windows setup metadata")
+          PY
 
   draft:
     if: github.event_name == 'workflow_dispatch' && inputs.create_draft
