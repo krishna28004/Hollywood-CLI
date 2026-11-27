@@ -36,9 +36,9 @@ Copy-Item -LiteralPath (Join-Path $payload 'win-arm64/hollywood.exe') -Destinati
 
 $scriptPath = Join-Path $PSScriptRoot '../../packaging/windows/hollywood.iss'
 if (-not $OnlyFailure) {
-    & $CompilerPath '/DAppVersion=0.2.1' "/O$fixtureRoot" '/FHollywood-Upgrade-Test' $scriptPath
+    & $CompilerPath '/DTestFixture=1' '/DAppVersion=0.2.1' "/O$fixtureRoot" '/FHollywood-Upgrade-Test' $scriptPath
     if ($LASTEXITCODE -ne 0) { throw 'Failed to compile the valid version 0.2.1 upgrade fixture.' }
 }
-& $CompilerPath '/DAppVersion=0.2.2' '/DPayloadRoot=..\..\artifacts\installer\test-fixtures\invalid-payload' "/O$fixtureRoot" '/FHollywood-Failure-Test' $scriptPath
+& $CompilerPath '/DTestFixture=1' '/DAppVersion=0.2.2' '/DPayloadRoot=..\..\artifacts\installer\test-fixtures\invalid-payload' "/O$fixtureRoot" '/FHollywood-Failure-Test' $scriptPath
 if ($LASTEXITCODE -ne 0) { throw 'Failed to compile the deliberately invalid rollback fixture.' }
 Write-Host "Created test-only fixtures in $fixtureRoot"

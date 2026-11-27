@@ -68,7 +68,7 @@ if ($registeredInstall) {
 function Get-EffectivePath {
     $userPathProperty = Get-ItemProperty -LiteralPath $environmentKey -Name Path -ErrorAction SilentlyContinue
     $userPath = if ($userPathProperty) { [Environment]::ExpandEnvironmentVariables([string]$userPathProperty.Path) } else { '' }
-    return (@($userPath, $machinePath) | Where-Object { $_ }) -join ';'
+    return (@($machinePath, $userPath) | Where-Object { $_ }) -join ';'
 }
 
 function Invoke-CapturedProcess([string] $FileName, [string] $Arguments, [string] $WorkingDirectory, [string] $PathValue) {
@@ -111,8 +111,9 @@ function Get-InstalledCommandName {
 }
 
 function Assert-CommandWorks([string] $CommandName, [string] $TargetDir, [string] $ExpectedVersion = $Version) {
-    # Put the install under test first so an older installed copy cannot mask a broken launcher.
-    $pathValue = $TargetDir + ';' + (Get-EffectivePath)
+    # Reconstruct a new Windows session's PATH from its persistent sources.
+    $pathValue = Get-EffectivePath
+    Assert ((Get-PathCount $pathValue $TargetDir) -eq 1) 'The installed PATH entry is missing or duplicated in a fresh environment.'
     $expected = "Hollywood CLI $ExpectedVersion"
     $cmd = Invoke-CapturedProcess $env:ComSpec "/d /c $CommandName --version" $env:WINDIR $pathValue
     Assert ($cmd.ExitCode -eq 0 -and $cmd.Output.Contains($expected)) "CMD could not launch $CommandName from $env:WINDIR. $($cmd.Error)"
@@ -219,6 +220,8 @@ function Run-InstallLifecycle([string] $TargetDir, [string] $ProcessPath, [strin
             Assert (-not (Test-Path -LiteralPath $configPath)) 'Installer created an unexpected user configuration file.'
         }
         Assert (-not (Test-Path -LiteralPath (Join-Path $target 'versions'))) 'Uninstall left the installed application payload behind.'
+        Assert (-not (Test-Path -LiteralPath (Join-Path $target "$command.cmd"))) 'Uninstall left the generated CMD launcher behind.'
+        Assert (-not (Test-Path -LiteralPath $bashLauncher)) 'Uninstall left the generated Bash launcher behind.'
         $coverage = @('install', 'command lookup from another directory')
         if (-not $SkipRepeatAndRepairChecks) { $coverage += @('repeated install', 'repair') }
         if ($UpgradeInstaller) { $coverage += 'upgrade' }

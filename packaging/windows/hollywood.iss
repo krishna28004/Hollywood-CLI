@@ -25,8 +25,12 @@ SetupLogging=yes
 ChangesEnvironment=no
 OutputDir=..\..\artifacts\installer\releases\windows
 OutputBaseFilename=Hollywood-Setup
+#ifdef TestFixture
+Compression=none
+#else
 Compression=lzma2
 SolidCompression=yes
+#endif
 WizardStyle=modern
 MinVersion=10.0
 
@@ -337,26 +341,60 @@ begin
   Result := AddBackslash(Dir) + SelectedCommand;
 end;
 
-function BuildLauncherContent(Dir: String): AnsiString;
+function BuildLauncherContent(Version: String): AnsiString;
 var
   Executable: String;
 begin
-  Executable := '"%~dp0versions\{#AppVersion}\' + SelectedRuntime + '\hollywood.exe"';
+  Executable := '"%~dp0versions\' + Version + '\' + SelectedRuntime + '\hollywood.exe"';
   Result := '@echo off' + #13#10 + 'setlocal' + #13#10 + Executable + ' %*' + #13#10 +
     'exit /b %errorlevel%' + #13#10;
 end;
 
-function BuildBashLauncherContent(Dir: String): AnsiString;
+function BuildBashLauncherContent(Version: String): AnsiString;
 begin
   Result := '#!/usr/bin/env bash' + #10 +
     'set -e' + #10 +
     'SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"' + #10 +
-    'APP="$SCRIPT_DIR/versions/{#AppVersion}/' + SelectedRuntime + '/hollywood.exe"' + #10 +
+    'APP="$SCRIPT_DIR/versions/' + Version + '/' + SelectedRuntime + '/hollywood.exe"' + #10 +
     'if [[ ! -f "$APP" ]]; then echo "Hollywood executable not found: $APP" >&2; exit 127; fi' + #10 +
     'if [[ -t 0 && -t 1 && -z "${WT_SESSION:-}" ]] && command -v winpty >/dev/null 2>&1; then' + #10 +
     '  exec winpty "$APP" "$@"' + #10 +
     'fi' + #10 +
     'exec "$APP" "$@"' + #10;
+end;
+
+procedure RemoveGeneratedLauncher(FileName: String; IsBash: Boolean);
+var
+  ActualContent: AnsiString;
+  Tail: String;
+  Version: String;
+  Boundary: Integer;
+  Index: Integer;
+  Separator: String;
+begin
+  if not FileExists(FileName) or not LoadStringFromFile(FileName, ActualContent) then
+    Exit;
+  Separator := '\';
+  if IsBash then
+    Separator := '/';
+  Boundary := Pos('versions' + Separator, String(ActualContent));
+  if Boundary = 0 then
+    Exit;
+  Tail := Copy(String(ActualContent), Boundary + Length('versions') + 1, Length(ActualContent));
+  Boundary := Pos(Separator, Tail);
+  if (Boundary < 2) or (Boundary > 65) then
+    Exit;
+  Version := Copy(Tail, 1, Boundary - 1);
+  for Index := 1 to Length(Version) do
+    if Pos(Version[Index], '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.-') = 0 then
+      Exit;
+  { The uninstall engine can retain an earlier setup's compiled version.
+    Check the complete generated launcher for the version it actually refers to. }
+  if IsBash then begin
+    if ActualContent = BuildBashLauncherContent(Version) then
+      DeleteFile(FileName);
+  end else if ActualContent = BuildLauncherContent(Version) then
+    DeleteFile(FileName);
 end;
 
 function AppExePath(Dir: String): String;
@@ -416,19 +454,11 @@ end;
 procedure RemoveStaleLauncher(Dir, Command: String);
 var
   CurrentCommand: String;
-  FileName: String;
-  ActualContent: AnsiString;
 begin
   CurrentCommand := SelectedCommand;
   SelectedCommand := Command;
-  FileName := LauncherFileName(Dir);
-  if FileExists(FileName) and LoadStringFromFile(FileName, ActualContent) and
-    (ActualContent = BuildLauncherContent(Dir)) then
-    DeleteFile(FileName);
-  FileName := BashLauncherFileName(Dir);
-  if FileExists(FileName) and LoadStringFromFile(FileName, ActualContent) and
-    (ActualContent = BuildBashLauncherContent(Dir)) then
-    DeleteFile(FileName);
+  RemoveGeneratedLauncher(LauncherFileName(Dir), False);
+  RemoveGeneratedLauncher(BashLauncherFileName(Dir), True);
   SelectedCommand := CurrentCommand;
 end;
 
@@ -467,8 +497,8 @@ begin
   PreviousBashLauncher := '';
   if PreviousBashLauncherExists then
     LoadStringFromFile(BashLauncherName, PreviousBashLauncher);
-  LauncherText := BuildLauncherContent(AppDir);
-  BashLauncherText := BuildBashLauncherContent(AppDir);
+  LauncherText := BuildLauncherContent('{#AppVersion}');
+  BashLauncherText := BuildBashLauncherContent('{#AppVersion}');
 
   if not AtomicWriteLauncher(LauncherName, LauncherText) then begin
     SetInstallFailure('Hollywood could not create its command launcher. No PATH change was made.');
@@ -567,8 +597,6 @@ var
   AppDir: String;
   StoredCommand: String;
   StoredRuntime: String;
-  LauncherName: String;
-  ActualLauncher: AnsiString;
   KeptCount: Integer;
 begin
   AppDir := ExpandConstant('{app}');
@@ -576,14 +604,8 @@ begin
     RegQueryStringValue(HKCU, AppInstallStateKey, RuntimeValueName, StoredRuntime) then begin
     SelectedCommand := StoredCommand;
     SelectedRuntime := StoredRuntime;
-    LauncherName := LauncherFileName(AppDir);
-    if FileExists(LauncherName) and LoadStringFromFile(LauncherName, ActualLauncher) and
-      (ActualLauncher = BuildLauncherContent(AppDir)) then
-      DeleteFile(LauncherName);
-    LauncherName := BashLauncherFileName(AppDir);
-    if FileExists(LauncherName) and LoadStringFromFile(LauncherName, ActualLauncher) and
-      (ActualLauncher = BuildBashLauncherContent(AppDir)) then
-      DeleteFile(LauncherName);
+    RemoveGeneratedLauncher(LauncherFileName(AppDir), False);
+    RemoveGeneratedLauncher(BashLauncherFileName(AppDir), True);
   end;
 
   if RegQueryDWordValue(HKCU, AppInstallStateKey, PathOwnedValueName, AddedByInstaller) and
